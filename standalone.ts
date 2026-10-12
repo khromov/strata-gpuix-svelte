@@ -1,10 +1,9 @@
-// The entry `npm run build` compiles: a binary carries no source to hot-reload, so it imports the
-// component statically and mounts it with `render`.
+// `render_hot` re-imports the component from disk on every save, and a binary
+// has no source on disk, so the compiled entry mounts it through a static import.
 import { render } from 'gpuix-svelte';
 import App from './App.svelte';
+import { create_app } from './lib/app.ts';
+import { WINDOW } from './lib/window.ts';
 
-render(App, {
-	title: 'gpuix-svelte starter',
-	width: 640,
-	height: 480
-});
+const app = await create_app();
+render(App, { ...WINDOW, props: { app } });

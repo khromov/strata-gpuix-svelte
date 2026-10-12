@@ -1,3 +1,9 @@
 node_modules
 dist
 .DS_Store
+
+# the database, its media cache and the downloaded models
+.data
+
+# compiled on demand by lib/recorder.ts
+native/.recorder-shim.dylib

@@ -1,66 +1,84 @@
 <script lang="ts">
-	let count = $state(0);
+	import { on_window_key, set_css_vars, set_window_title, type GpuixEvent } from 'gpuix-svelte';
+	import Portal from 'gpuix-svelte/components/Portal.svelte';
+	import { untrack } from 'svelte';
+	import ContextMenu from './components/ContextMenu.svelte';
+	import Sidebar from './components/Sidebar.svelte';
+	import Toasts from './components/Toasts.svelte';
+	import TopBar from './components/TopBar.svelte';
+	import type { App } from './lib/app.ts';
+	import { bind_app } from './lib/data.svelte.ts';
+	import { bind_feeds } from './lib/feed-filter.svelte.ts';
+	import { back, push, route, type RouteEntry } from './lib/router.svelte.ts';
+	import { bind_theme, start_system_poll, tokens } from './lib/theme.svelte.ts';
+	import { focus, ui } from './lib/ui.svelte.ts';
+	import RouteView from './RouteView.svelte';
+
+	let { app }: { app: App } = $props();
+
+	// Both are idempotent: the state modules outlive a hot remount, the app object too.
+	untrack(() => {
+		bind_app(app);
+		bind_theme(app);
+		bind_feeds(app);
+		// Before the template below is styled; the $effect only carries later switches.
+		set_css_vars(tokens());
+	});
+
+	const ROUTES: RouteEntry[] = [
+		{ path: '/', load: () => import('./routes/Everything.svelte'), title: 'Everything' },
+		{ path: '/notes', load: () => import('./routes/Kind.svelte'), props: { kind: 'text' }, title: 'Notes' },
+		{ path: '/links', load: () => import('./routes/Kind.svelte'), props: { kind: 'link' }, title: 'Links' },
+		{ path: '/images', load: () => import('./routes/Kind.svelte'), props: { kind: 'image' }, title: 'Images' },
+		{ path: '/audio', load: () => import('./routes/Kind.svelte'), props: { kind: 'audio' }, title: 'Audio' },
+		{ path: '/feeds', load: () => import('./routes/Feeds.svelte'), title: 'Feeds' },
+		{ path: '/search', load: () => import('./routes/Search.svelte'), title: 'Search' },
+		{ path: '/item/:id', load: () => import('./routes/Item.svelte'), title: 'Item' },
+		{ path: '/ask', load: () => import('./routes/Ask.svelte'), title: 'Ask' },
+		{ path: '/settings', load: () => import('./routes/Settings.svelte'), title: 'Settings' },
+		{ path: '*', load: () => import('./routes/NotFound.svelte'), title: 'Not found' }
+	];
+
+	$effect(() => start_system_poll());
+	// The palette is the only theme: every `var(--…)` in the style block below resolves against it.
+	$effect(() => set_css_vars(tokens()));
+	$effect(() => {
+		set_window_title(ui.title === 'Everything' ? 'Substrate' : `Substrate — ${ui.title}`);
+	});
+
+	function onkey(e: GpuixEvent) {
+		const cmd = e.modifiers?.cmd || e.modifiers?.ctrl;
+		if (cmd && e.key === 'k') return focus('search');
+		if (cmd && e.key === 'n') {
+			if (route.path !== '/') push('/');
+			setTimeout(() => focus('capture'), 30);
+			return;
+		}
+		if (cmd && e.key === ',') return push('/settings');
+		if (e.key === 'escape') {
+			// An open dialog, menu or focused text field each get the same key and handle it themselves.
+			if (ui.modals > 0 || ui.menu || e.editing) return;
+			if (route.path !== '/') back();
+		}
+	}
+
+	$effect(() => on_window_key('keydown', onkey));
 </script>
 
-<div class="app">
-	<div class="card">
-		<div class="count" testId="count">{count}</div>
-		<div class="row">
-			<div class="btn" testId="minus" onclick={() => count--}>-</div>
-			<div class="btn primary" testId="plus" onclick={() => count++}>+</div>
+<div class="root" testId="root">
+	<Sidebar />
+	<div class="main">
+		<TopBar />
+		<div class="page">
+			<RouteView routes={ROUTES} />
 		</div>
-		<div class="hint">Edit App.svelte and save — the window hot-reloads.</div>
 	</div>
+	<Portal><Toasts /></Portal>
+	<Portal><ContextMenu /></Portal>
 </div>
 
 <style>
-	.app {
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		width: 100%;
-		height: 100%;
-		background-color: #11111b;
-	}
-	.card {
-		display: flex;
-		flex-direction: column;
-		align-items: center;
-		gap: 16px;
-		padding: 32px;
-		background-color: #1e1e2e;
-		border-radius: 12px;
-	}
-	.count {
-		font-size: 48px;
-		font-weight: bold;
-		color: #cdd6f4;
-	}
-	.row {
-		display: flex;
-		flex-direction: row;
-		gap: 12px;
-	}
-	.btn {
-		padding: 12px 24px;
-		border-radius: 8px;
-		background-color: #313244;
-		color: #cdd6f4;
-		font-weight: bold;
-		cursor: pointer;
-	}
-	.btn:hover {
-		background-color: #45475a;
-	}
-	.primary {
-		background-color: #a6e3a1;
-		color: #1e1e2e;
-	}
-	.primary:hover {
-		background-color: #94e2d5;
-	}
-	.hint {
-		color: #a6adc8;
-		font-size: 13px;
-	}
+	.root { position: relative; display: flex; flex-direction: row; width: 100%; height: 100%; font-family: IBM Plex Sans; font-size: 13px; line-height: 20px; background-color: var(--bg); color: var(--ink); selection-color: var(--selection); }
+	.main { display: flex; flex-direction: column; flex-grow: 1; min-width: 0; min-height: 0; height: 100%; }
+	.page { display: flex; flex-direction: column; flex-grow: 1; min-height: 0; }
 </style>

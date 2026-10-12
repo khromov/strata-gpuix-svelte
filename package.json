@@ -2,15 +2,27 @@
 	"name": "substrate-gpuix-svelte",
 	"private": true,
 	"version": "0.0.0",
+	"description": "Substrate, a second brain in a native GPUI window: notes, links, images and voice memos, hybrid search and RAG chat, built with gpuix-svelte",
 	"type": "module",
 	"scripts": {
-		"start": "gpuix-svelte app.ts",
-		"test": "gpuix-svelte test.ts",
+		"start": "gpuix-svelte --bun app.ts",
+		"test": "gpuix-svelte --bun test/brain.ts && gpuix-svelte --bun test/smoke.ts",
 		"build": "bun build.ts",
-		"typecheck": "tsc --noEmit && svelte-check --diagnostic-sources js,svelte --fail-on-warnings"
+		"typecheck": "tsc --noEmit && svelte-check --diagnostic-sources js,svelte --fail-on-warnings",
+		"ml:install": "bun install --cwd ml",
+		"ml:doctor": "bun ml/doctor.ts",
+		"import-hn": "bun scripts/import-hn.ts",
+		"frames": "gpuix-svelte --bun scripts/frame-cost.ts"
+	},
+	"engines": {
+		"bun": ">=1.4.0"
 	},
 	"dependencies": {
-		"gpuix-svelte": "^0.1.1"
+		"croner": "^10.0.1",
+		"gpuix-svelte": "^0.1.1",
+		"marked": "^18.0.11",
+		"mpg123-decoder": "^1.0.3",
+		"wasm-media-encoders": "^0.7.0"
 	},
 	"devDependencies": {
 		"@types/bun": "^1.4.0",
