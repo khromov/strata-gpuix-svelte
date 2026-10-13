@@ -1,9 +1,9 @@
 <script lang="ts">
-	import type { GpuixEvent } from 'gpuix-svelte';
+	import { find_ranges, type GpuixEvent } from 'gpuix-svelte';
 	import { ago, data, display_title, get_app, preview, status_text } from '../lib/data.svelte.ts';
 	import { feed_actions, item_actions } from '../lib/menus.ts';
 	import { push } from '../lib/router.svelte.ts';
-	import { match_ranges } from '../lib/rank.ts';
+	import { merge_ranges } from '../lib/rank.ts';
 	import type { Item } from '../lib/store.ts';
 	import { resolved } from '../lib/theme.svelte.ts';
 	import { is_secondary, open_menu } from '../lib/ui.svelte.ts';
@@ -40,7 +40,8 @@
 	const text = $derived(snippet ?? preview(item));
 	const mark = (s: string) => {
 		if (!terms?.length) return null;
-		const ranges = match_ranges(s, terms);
+		// Native's own matcher, so the ranges land on the original text even where lowercasing changes its length.
+		const ranges = merge_ranges(terms.flatMap((term) => find_ranges(s, term)));
 		return ranges.length ? { ranges, color: MARK[mode], radius: 3 } : null;
 	};
 	const feed = $derived(item.feed_id == null ? null : (data.feeds.find((f) => f.id === item.feed_id) ?? null));

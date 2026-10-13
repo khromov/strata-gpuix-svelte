@@ -83,6 +83,22 @@ function trim(entries: MenuEntry[]): MenuEntry[] {
 	return out;
 }
 
+let tab_spent = false;
+
+/**
+ * GPUI bubbles a key to the window's handler after the focused field's own, so a field that
+ * spends Tab itself (the search box taking a completion) marks it here for App's tab order to skip.
+ */
+export function spend_tab() {
+	tab_spent = true;
+}
+
+export function take_spent_tab() {
+	const spent = tab_spent;
+	tab_spent = false;
+	return spent;
+}
+
 const nodes: Record<string, ShadowNode> = {};
 let next_toast = 1;
 let ticker: ReturnType<typeof setInterval> | null = null;

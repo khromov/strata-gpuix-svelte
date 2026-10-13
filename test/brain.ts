@@ -12,6 +12,7 @@ import { existsSync, mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { basename, join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { find_ranges } from "gpuix-svelte";
 import { parse_appearance } from "../lib/appearance.ts";
 import { create_app } from "../lib/app.ts";
 import { markdown_blocks } from "../lib/blocks.ts";
@@ -22,7 +23,7 @@ import { MlStub } from "../lib/ml-stub.ts";
 import {
   chunk_body,
   fts_query,
-  match_ranges,
+  merge_ranges,
   parse_query,
   query_terms,
   rrf,
@@ -388,10 +389,25 @@ import { check, finish } from "gpuix-svelte/test";
     snippet_around("nothing here", terms),
     null,
   );
+  // What ItemCard hands GPUI's `highlight`: native's matcher per term, merged.
+  const marks = (text: string) =>
+    JSON.stringify(merge_ranges(terms.flatMap((term) => find_ranges(text, term))));
   check(
-    "match_ranges finds every occurrence",
-    JSON.stringify(match_ranges("Compost, worms, compost.", terms)),
+    "highlight ranges find every occurrence",
+    marks("Compost, worms, compost."),
     "[[0,7],[9,14],[16,23]]",
+  );
+  // "İ" lowercases to two code units, which shifted every later match when the
+  // matching ran over a lowercased copy of the text.
+  check(
+    "highlight ranges stay on the original text",
+    marks("İzmir compost"),
+    "[[6,13]]",
+  );
+  check(
+    "merge_ranges sorts and joins overlaps",
+    JSON.stringify(merge_ranges([[9, 14], [0, 7], [3, 9]])),
+    "[[0,9],[9,14]]",
   );
 
   const site = { siteName: "Newsonaut", hostname: "newsonaut.com" };
@@ -1221,4 +1237,4 @@ if (recorder) {
   check("still idle after stop", rec.isRecording(), false);
 }
 
-finish("brain", recorder ? 220 : 215);
+finish("brain", recorder ? 222 : 217);

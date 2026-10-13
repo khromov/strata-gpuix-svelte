@@ -172,7 +172,7 @@ All optional, all `GPUIX_BRAIN_*`:
 | readable text from a page | one synchronous `HTMLRewriter` pass (`lib/scrape.ts`) that scores candidate containers. lol-html keeps one `onEndTag` callback per element and the element handle is dead inside it — `scrape.ts` shows the way around |
 | AVIF / HEIC on screen | GPUI's image crate cannot decode them; `Bun.Image` (ImageIO) stores a WebP display copy beside the original |
 | shrinking a recording | LAME as WebAssembly (`wasm-media-encoders`, `lib/mp3.ts`): once the transcript exists, a memo the app recorded itself is re-encoded from 16 kHz PCM to 32 kbps MP3 in place, about eight times smaller, and mpg123 decodes it back if it is ever re-transcribed. An imported file is the user's master and is never rewritten |
-| search-hit highlighting | GPUI's native `highlight={{ ranges }}` prop, unlocked in gpuix-svelte's renderer for this app |
+| search-hit highlighting | GPUI's native `highlight={{ ranges }}` prop, unlocked in gpuix-svelte's renderer for this app, with the ranges from gpuix-svelte's `find_ranges` (native's own matcher, one call per query term) |
 | reading a feed | a small XML scanner (`lib/feeds/xml.ts`) rather than `HTMLRewriter`, which is an HTML parser: it voids `<link/>`, lowercases and reshapes the tree, so Atom's `<link href>` and `<content type="html">` do not survive it. The HTML *inside* an entry does go through `extract()` |
 
 ## About client-side routers

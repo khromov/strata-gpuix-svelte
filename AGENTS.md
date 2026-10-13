@@ -54,6 +54,10 @@ fake data and a stub worker — screenshots), `START=/settings`, `THEME=light|da
 - Right-click menus on every surface: `components/ContextMenu.svelte` draws them, `lib/menus.ts`
   says what is in them. GPUI routes macOS's ctrl+click to `click`, not `auxClick`, so
   `is_secondary(e)` in `lib/ui.svelte.ts` is that check written once.
+- Tab reaches `keydown` as an ordinary key, so `App.svelte` walks the window's fields with
+  `focus_next()` / `focus_previous()`. The focused field's own `onkeydown` runs first, and one that
+  spends Tab itself (the search box taking a completion) calls `spend_tab()` so the window skips it.
+  As of native 0.10, `focus_previous()` does not move off an `<input>` or `<textarea>`.
 - Recording and playback work on macOS (AVFoundation via the clang-built `native/recorder-shim.m`)
   and on Windows (winmm's waveIn/waveOut straight over `bun:ffi`, no shim to compile —
   `lib/winmm.ts`, `lib/recorder-win.ts`, `lib/player-win.ts`).
@@ -79,8 +83,9 @@ recorder writes), the page extractor, SSE parser, chunker, vector index, store a
 stub worker, the feed parser and poller over fixture documents, the Windows mic consent parser,
 and the real IPC client against a fake worker (`test/fake-worker.ts`), including a crash.
 `test/smoke.ts` mounts the app headlessly and captures, opens, deletes through GPUI's real hit
-testing; a long page paints only the rows in view. Prefer the click/press helpers over calling
-`dispatch()` directly, which bypasses hit testing.
+testing; a long page paints only the rows in view. Prefer the click/press/hover helpers over
+calling `dispatch()` directly, which bypasses hit testing; `wait_for(pred)` waits on timers (a
+tooltip's delay), and `painted_highlights()` reads back what `highlight` painted.
 
 The headless renderer (Metal) crashes under a sandboxed shell ("Swift Fatal error: Array index out
 of range", hiservices XPC errors); run tests and the app with the sandbox off.
@@ -92,8 +97,8 @@ Scroll lag here is native per-frame layout, not JS, so measure before reasoning.
 the data, visits each route (default: `/`, `/settings` and the item with the longest body), and
 prints a table of GPUI's own draw times: idle frames over 2 s, then p90/p99/max and fps while 90
 wheel events scroll the content column. `--keep` leaves the window open with the overlay on, for
-scrolling by hand. It is a thin script over `setDebugFrameOverlay('full')`,
-`resetDebugFrameOverlayStats()`, `getDebugFrameOverlayStats()` and
+scrolling by hand. It is a thin script over gpuix-svelte's `debugFrameOverlay` render option,
+`reset_debug_overlay_stats()` and `debug_overlay_stats()`, plus native's
 `simulateScrollWheel(x, y, dx, dy)`, which `GpuixRenderer` and `TestGpuixRenderer` both expose.
 Baselines on 2026-10-12 (native 0.10.0, 1180×780, scroll p90): the timeline ~2.2 ms a frame,
 settings ~6.1 ms, the longest item ~1.9 ms. On 2026-09-03 (native 0.7.0) they were ~4.6, ~7–9 and
@@ -129,9 +134,9 @@ binary has no source to hot-reload; keep its window options in step with `app.ts
   `virtual-list`, `anchored`. `<img src>` takes a file path, a `data:` URL or an http(s) URL, plus
   a width and a height.
 - Style with `<style>` class rules (`.btn`, `.btn.primary`, `.btn:hover`, `.btn:active`) and inline
-  `style=`. Layout is flexbox in logical pixels: lengths in `px`, and `%`/`auto` for `width`,
-  `height`, `min-*` and `max-*`. Use `flex-grow: 1` for `flex: 1`, and `border-width` plus
-  `border-color` for `border`. The styling page lists every property.
+  `style=`. Layout is flexbox in logical pixels: lengths in `px` or `rem` (16 px), and `%`/`auto`
+  for `width`, `height`, `min-*` and `max-*`. Use `flex-grow: 1` for `flex: 1`, and `border-width`
+  plus `border-color` for `border`. The styling page lists every property.
 - Colours go in `var(--token)`, from the palette in `lib/theme.ts`.
 - Inputs report through events: `<input value={text} onchange={(e) => (text = e.value)} />`.
   `{@attach (node) => ...}` hands you an element.
@@ -142,7 +147,11 @@ binary has no source to hot-reload; keep its window options in step with `app.ts
   from an `$effect` so it unsubscribes.
 - Scrolling content goes in `Scroller` (`gpuix-svelte/components/Scroller.svelte`), which draws the
   scrollbar; modals, menus and toasts go in `Portal` (`gpuix-svelte/components/Portal.svelte`),
-  which paints on top.
+  which paints on top; hover tips and dropdowns that sit beside a trigger go in `Tooltip` and
+  `Popover` from the same directory. `IconButton`'s `tip` is a `Tooltip`, coloured by the palette's
+  `tooltip-surface` and `tooltip-ink`.
+- `window_size` from `gpuix-svelte` is the window's size, reactive in a template or `$derived`; it
+  polls only while something reactive reads it, so keep reads inside components.
 - Handlers take `GpuixEvent` and `{@attach}` gets a `ShadowNode`, both importable as types from
   `gpuix-svelte`.
 

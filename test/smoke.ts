@@ -14,11 +14,12 @@ process.env.GPUIX_BRAIN_THEME = 'dark';
 import { existsSync, mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { dispatch } from 'gpuix-svelte';
+import { dispatch, focused_element, window_size } from 'gpuix-svelte';
 import {
 	mount_headless,
 	click_at,
 	wait,
+	wait_for,
 	focus,
 	unfocus,
 	find,
@@ -26,8 +27,10 @@ import {
 	find_test_id,
 	click_text,
 	click_test_id,
+	hover,
 	press,
 	painted,
+	painted_highlights,
 	all_text,
 	screenshot,
 	check,
@@ -67,6 +70,12 @@ async function tap(text: string, opts?: ClickOptions) {
 	await wait();
 }
 
+/** `wait_for` as a check: false once its timeout passes, rather than a throw. */
+const eventually = (pred: () => unknown) => wait_for(pred).then(
+	() => true,
+	() => false
+);
+
 await wait();
 await wait();
 check('brand painted', painted().includes('Substrate'));
@@ -100,6 +109,12 @@ check('card click opens the item route', route.path, `/item/${note.id}`);
 check('item page paints the body', painted().includes('Buy compost for the raised beds'));
 check('window title follows the route', ui.title, 'Item');
 
+// The back button is an icon alone, so what it does is a Tooltip away.
+hover(find_test_id('back')!);
+check('hovering the back button shows its tip', await eventually(() => painted().includes('Back (Esc)')));
+hover({ x: 600, y: 300 });
+check('and leaving it hides the tip', await eventually(() => !painted().includes('Back (Esc)')));
+
 press('escape');
 await wait();
 check('escape goes back', route.path, '/');
@@ -126,7 +141,7 @@ check('a middle click opens nothing', find_test_id('menu'), null);
 check('escape closes the menu', find_test_id('menu'), null);
 check('without navigating away', route.path, '/');
 
-const { width } = native.getWindowSize();
+const { width } = window_size;
 click_at(width - 20, 200, { button: 2 });
 await wait();
 check('empty space offers the capture actions', painted().includes('Paste from clipboard'));
@@ -186,15 +201,22 @@ await wait();
 check('scrolling to the end paints the last block', painted().includes('Paragraph 149 of the long page.'));
 await tap('Substrate');
 
-// Typing `k` into the search box offers `kind:`; picking a kind completes and searches.
+// Tab reaches keydown as an ordinary key; App walks the window's fields with focus_next().
 const search_input = find((n) => n.type === 'input');
+focus(search_input!);
+press('tab');
+check('tab moves from the search box to the capture box', focused_element()?.nativeId, find((n) => n.type === 'textarea')?.id);
+unfocus();
+
+// Typing `k` into the search box offers `kind:`; Tab takes it, and clicking a kind completes and searches.
 focus(search_input!);
 dispatch({ elementId: search_input!.id, eventType: 'change', value: 'k' });
 await wait();
 check('typing k suggests kind:', ui.suggest?.items.map((i) => i.label).join(','), 'kind:');
 check('suggestion painted', painted().includes('filter by kind — note, link, image or audio'));
-await tap('kind:');
-check('picking kind: suggests the kinds', ui.suggest?.items.map((i) => i.label).join(','), 'kind:note,kind:link,kind:image,kind:audio');
+press('tab');
+check('tab takes the completion, which suggests the kinds', ui.suggest?.items.map((i) => i.label).join(','), 'kind:note,kind:link,kind:image,kind:audio');
+check('and leaves focus in the search box', focused_element()?.nativeId, search_input!.id);
 await tap('kind:image');
 await wait(250);
 check('completion searches by kind', route.path === '/search' && route.query.q, 'kind:image');
@@ -264,6 +286,9 @@ await tap('Include feeds');
 await wait(250);
 await wait();
 check('ticking it brings them back', painted().includes('Mycelium and the wood wide web'));
+// Read back from what native painted, so the ranges are checked against the text they landed on.
+const marked = painted_highlights().map((h) => h.text.slice(h.start, h.end).toLowerCase());
+check('the query is highlighted in the hit', marked.length > 0 && marked.every((m) => m === 'mycelium'));
 check('and persists as a setting', app.settings.get('feeds.include'), true);
 
 push('/');
@@ -286,4 +311,4 @@ check('and it carries what search just set', find_test_id('settings-feeds')?.chi
 console.log('screenshot:', screenshot(join(tmpdir(), 'substrate-smoke.png')));
 
 app.close();
-finish('smoke', 67);
+finish('smoke', 72);

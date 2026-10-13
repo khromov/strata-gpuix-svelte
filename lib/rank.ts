@@ -103,22 +103,13 @@ export function snippet_around(text: string | null | undefined, terms: string[],
 	return (start > 0 ? '…' : '') + flat.slice(start, end) + (end < flat.length ? '…' : '');
 }
 
-/** Sorted, non-overlapping character ranges of every (lowercase) term occurrence, for GPUI's `highlight={{ ranges }}`. */
-export function match_ranges(text: string | null | undefined, terms: string[]): Array<[number, number]> {
-	const lower = (text ?? '').toLowerCase();
-	const ranges: Array<[number, number]> = [];
-	for (const term of terms) {
-		let from = 0;
-		for (;;) {
-			const at = lower.indexOf(term, from);
-			if (at === -1) break;
-			ranges.push([at, at + term.length]);
-			from = at + term.length;
-		}
-	}
-	ranges.sort((a, b) => a[0] - b[0]);
+/**
+ * Every term's matches as sorted, non-overlapping ranges, for GPUI's `highlight={{ ranges }}`:
+ * gpuix-svelte's `find_ranges` matches one query, and a search highlights several terms.
+ */
+export function merge_ranges(ranges: Array<[number, number]>): Array<[number, number]> {
 	const out: Array<[number, number]> = [];
-	for (const r of ranges) {
+	for (const r of [...ranges].sort((a, b) => a[0] - b[0])) {
 		const last = out[out.length - 1];
 		if (last && r[0] < last[1]) last[1] = Math.max(last[1], r[1]);
 		else out.push([r[0], r[1]]);

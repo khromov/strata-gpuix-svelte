@@ -26,7 +26,7 @@ const keep = args.includes('--keep');
 const wanted = args.filter((a) => !a.startsWith('--'));
 
 const { Database } = await import('bun:sqlite');
-const { render, get_native } = await import('gpuix-svelte');
+const { render, get_native, window_size, debug_overlay_stats, reset_debug_overlay_stats } = await import('gpuix-svelte');
 const { create_app } = await import('../lib/app.ts');
 const { MlStub } = await import('../lib/ml-stub.ts');
 const { default_root } = await import('../lib/paths.ts');
@@ -44,13 +44,13 @@ const routes = wanted.length ? wanted : ['/', '/settings', ...(longest ? [`/item
 console.log(`[frames] ${source} copied to ${data_dir}`);
 
 const app = await create_app({ data_dir, ml: new MlStub(), autoload: false });
-render(App, { ...WINDOW, props: { app } });
+// Stats are recorded whether or not the overlay shows; it is on for `--keep`, and to show what is measured.
+render(App, { ...WINDOW, props: { app }, debugFrameOverlay: 'full' });
 const native = get_native()!;
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 await sleep(1500);
-const { width, height } = native.getWindowSize();
-native.setDebugFrameOverlay('full');
+const { width, height } = window_size;
 
 const IDLE_MS = 2000;
 const WHEEL_EVENTS = 90;
@@ -59,11 +59,11 @@ for (const path of routes) {
 	push(path);
 	// A lazy route import, then the related-items query on an item page.
 	await sleep(1200);
-	native.resetDebugFrameOverlayStats();
+	reset_debug_overlay_stats();
 	await sleep(IDLE_MS);
-	const idle = native.getDebugFrameOverlayStats();
+	const idle = debug_overlay_stats()!;
 
-	native.resetDebugFrameOverlayStats();
+	reset_debug_overlay_stats();
 	const started = performance.now();
 	for (let i = 0; i < WHEEL_EVENTS; i++) {
 		// The content column sits right of the sidebar.
@@ -71,7 +71,7 @@ for (const path of routes) {
 		await sleep(16);
 	}
 	const elapsed = performance.now() - started;
-	const scroll = native.getDebugFrameOverlayStats();
+	const scroll = debug_overlay_stats()!;
 	const ms = (n?: number) => (n === undefined ? '-' : `${n.toFixed(1)} ms`);
 	rows.push([path, `${idle.frames}/${IDLE_MS / 1000}s`, ms(idle.maxMs), ms(scroll.p90Ms), ms(scroll.p99Ms), ms(scroll.maxMs), ((scroll.frames * 1000) / elapsed).toFixed(0)]);
 }

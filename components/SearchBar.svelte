@@ -3,7 +3,7 @@
 	import Portal from 'gpuix-svelte/components/Portal.svelte';
 	import SearchSuggest from './SearchSuggest.svelte';
 	import { push, replace, route } from '../lib/router.svelte.ts';
-	import { focus, register, ui } from '../lib/ui.svelte.ts';
+	import { focus, register, spend_tab, ui } from '../lib/ui.svelte.ts';
 	import Icon from './Icon.svelte';
 	import IconButton from './IconButton.svelte';
 
@@ -100,7 +100,10 @@
 		if (!s) return;
 		if (e.key === 'down') s.active = (s.active + 1) % s.items.length;
 		else if (e.key === 'up') s.active = (s.active - 1 + s.items.length) % s.items.length;
-		else if (e.key === 'tab') s.items[s.active]?.apply();
+		else if (e.key === 'tab') {
+			spend_tab();
+			s.items[s.active]?.apply();
+		}
 	}
 
 	function onfocus() {
@@ -136,7 +139,7 @@
 		testId="search-input"
 	/>
 	{#if value}
-		<IconButton icon="x" size={22} onclick={clear} />
+		<IconButton icon="x" tip="Clear search (Esc)" size={22} onclick={clear} />
 	{:else}
 		<div class="hint">⌘K</div>
 	{/if}

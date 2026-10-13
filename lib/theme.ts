@@ -51,7 +51,9 @@ export const LIGHT = {
 	selection: 'rgba(95, 122, 74, 0.28)',
 	scrim: 'rgba(42, 37, 31, 0.42)',
 	'scroller-thumb': '#cbbfa6',
-	'scroller-thumb-hover': '#b3a488'
+	'scroller-thumb-hover': '#b3a488',
+	'tooltip-surface': '#2a251f',
+	'tooltip-ink': '#f8f5ec'
 };
 
 export type Palette = typeof LIGHT;
@@ -102,7 +104,9 @@ export const DARK: Palette = {
 	selection: 'rgba(143, 174, 116, 0.32)',
 	scrim: 'rgba(0, 0, 0, 0.55)',
 	'scroller-thumb': '#4a4237',
-	'scroller-thumb-hover': '#5d5447'
+	'scroller-thumb-hover': '#5d5447',
+	'tooltip-surface': '#4a4237',
+	'tooltip-ink': '#ece3d3'
 };
 
 export const KIND_COLOR = {

@@ -11,6 +11,7 @@
 	{#if can_back()}
 		<IconButton
 			icon="back"
+			tip="Back (Esc)"
 			size={30}
 			onclick={() => {
 				back();

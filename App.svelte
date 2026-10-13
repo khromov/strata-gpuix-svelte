@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { on_window_key, set_css_vars, set_window_title, type GpuixEvent } from 'gpuix-svelte';
+	import { focus_next, focus_previous, on_window_key, set_css_vars, set_window_title, type GpuixEvent } from 'gpuix-svelte';
 	import Portal from 'gpuix-svelte/components/Portal.svelte';
 	import { untrack } from 'svelte';
 	import ContextMenu from './components/ContextMenu.svelte';
@@ -11,7 +11,7 @@
 	import { bind_feeds } from './lib/feed-filter.svelte.ts';
 	import { back, push, route, type RouteEntry } from './lib/router.svelte.ts';
 	import { bind_theme, start_system_poll, tokens } from './lib/theme.svelte.ts';
-	import { focus, ui } from './lib/ui.svelte.ts';
+	import { focus, take_spent_tab, ui } from './lib/ui.svelte.ts';
 	import RouteView from './RouteView.svelte';
 
 	let { app }: { app: App } = $props();
@@ -55,6 +55,13 @@
 			return;
 		}
 		if (cmd && e.key === ',') return push('/settings');
+		// Tab reaches keydown as an ordinary key, so the order through the window's fields is wired here.
+		// As of native 0.10, focus_previous() leaves an <input> or <textarea> focused, so Shift+Tab only
+		// steps back from a tabindex stop.
+		if (e.key === 'tab' && !cmd) {
+			if (take_spent_tab() || ui.modals > 0 || ui.menu) return;
+			return e.modifiers?.shift ? focus_previous() : focus_next();
+		}
 		if (e.key === 'escape') {
 			// An open dialog, menu or focused text field each get the same key and handle it themselves.
 			if (ui.modals > 0 || ui.menu || e.editing) return;

@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { get_native, on_window_key, type GpuixEvent } from 'gpuix-svelte';
+	import { on_window_key, window_size, type GpuixEvent } from 'gpuix-svelte';
 	import { route } from '../lib/router.svelte.ts';
 	import { close_menu, ui, type MenuAction } from '../lib/ui.svelte.ts';
 	import Icon from './Icon.svelte';
@@ -21,16 +21,14 @@
 	const actions = $derived(rows.flatMap((row) => (row.separator ? [] : [row.action])));
 
 	// Sized from the row count against the metrics the style block below uses, rather than
-	// measured, so the flip lands in the frame the menu first appears in.
+	// measured, so the flip lands in the frame the menu first appears in. `window_size` is only
+	// read while a menu is open, so that is the only time it polls, and a resize re-places it.
 	const placed = $derived.by(() => {
 		const open = ui.menu;
 		if (!open) return null;
-		const size = get_native()?.getWindowSize();
-		const window_width = size?.width ?? 1180;
-		const window_height = size?.height ?? 780;
 		const height = FRAME + (open.title ? TITLE : 0) + rows.reduce((sum, row) => sum + (row.separator ? SEPARATOR : ROW), 0);
-		const left = open.x + WIDTH > window_width - MARGIN ? Math.max(MARGIN, open.x - WIDTH) : open.x;
-		const top = open.y + height > window_height - MARGIN ? Math.max(MARGIN, open.y - height) : open.y;
+		const left = open.x + WIDTH > window_size.width - MARGIN ? Math.max(MARGIN, open.x - WIDTH) : open.x;
+		const top = open.y + height > window_size.height - MARGIN ? Math.max(MARGIN, open.y - height) : open.y;
 		return { left, top };
 	});
 
