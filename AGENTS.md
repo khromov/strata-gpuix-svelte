@@ -107,9 +107,8 @@ settings ~6.1 ms, the longest item ~1.9 ms. On 2026-09-03 (native 0.7.0) they we
 
 ## Memory
 
-The development machine has 16 GB of RAM and each `ml/worker.ts` loads ~1 GB of ONNX models: run
-one model-loading process at a time (the app, `ml:doctor`, `import-hn` — never in parallel), check
-`ps -axo pid,rss,command | grep worker` after background runs and kill orphans, and prefer
+The development machine has 16 GB of RAM and each `ml/worker.ts` loads ~1 GB of ONNX models:
+check `ps -axo pid,rss,command | grep worker` after background runs and kill orphans, and prefer
 `GPUIX_BRAIN_STUB=1` or `MlStub` for screenshots and tests. Keep the safeguards: chunk length
 capped by characters, embedding batches of 8, `enableCpuMemArena: false`, idle unload of
 Whisper/CLIP, and the worker's orphan watchdog.

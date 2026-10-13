@@ -70,6 +70,12 @@ export function parse_query(query: string | null | undefined): { text: string; k
 	return { text, kinds: kinds.size ? [...kinds] : null, unknown, feeds };
 }
 
+/** A query as a CLIP caption, unless it already says what kind of picture it wants. */
+export function clip_caption(query: string): string {
+	const q = query.trim();
+	return /^(an? )?(photo|picture|image|screenshot|drawing|painting)s?\b/i.test(q) ? q : `a photo of ${q}`;
+}
+
 /** The query's words, longest first, without FTS syntax. */
 export function query_terms(query: string | null | undefined): string[] {
 	return [...new Set((query ?? '').toLowerCase().replace(/["*]/g, ' ').split(/\s+/).filter((t) => t.length >= 2))].sort((a, b) => b.length - a.length);

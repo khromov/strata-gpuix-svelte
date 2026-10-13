@@ -1,6 +1,6 @@
 import { warn } from './log.ts';
 import type { MlLike } from './ml-client.ts';
-import { chunk_body, clip_snippet, fts_query, normalize_scores, parse_query, query_terms, rrf, snippet_around } from './rank.ts';
+import { chunk_body, clip_caption, clip_snippet, fts_query, normalize_scores, parse_query, query_terms, rrf, snippet_around } from './rank.ts';
 import { looks_like_url, normalize_url } from './scrape.ts';
 import type { Settings } from './settings.ts';
 import type { ChunkDetail, Item, Kind, ListOptions, Store } from './store.ts';
@@ -129,10 +129,19 @@ export function create_search({ store, vectors, images, ml, settings }: { store:
 
 		if (signals.includes('clip') && (!kinds || kinds.includes('image')) && images.size > 0) {
 			if (usable('clip')) {
+				// A bare word scores well under a caption ("dog" misses a dog photo that
+				// "a photo of dog" finds), while a long query can read worse as one, so both
+				// phrasings search and each image keeps its better score.
+				const phrasings = [...new Set([q, clip_caption(q)])];
 				tasks.push(
-					ml
-						.clip_text(q)
-						.then((vec) => (rankings.clip = images.top_k(vec, limit, { min_score: threshold('clip'), filter: exclude }).map((h) => ({ id: h.group, score: h.score }))))
+					Promise.all(phrasings.map((text) => ml.clip_text(text)))
+						.then((vecs) => {
+							const best = new Map<number, number>();
+							for (const vec of vecs) {
+								for (const h of images.top_k(vec, limit, { min_score: threshold('clip'), filter: exclude })) best.set(h.group, Math.max(h.score, best.get(h.group) ?? -1));
+							}
+							rankings.clip = [...best].map(([id, score]) => ({ id, score })).sort((a, b) => b.score - a.score).slice(0, limit);
+						})
 						.catch((err) => {
 							warn('image search failed:', (err as Error).message);
 							degraded.push('clip');

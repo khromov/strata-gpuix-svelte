@@ -22,6 +22,7 @@ import { MlClient } from "../lib/ml-client.ts";
 import { MlStub } from "../lib/ml-stub.ts";
 import {
   chunk_body,
+  clip_caption,
   fts_query,
   merge_ranges,
   parse_query,
@@ -369,6 +370,13 @@ import { check, finish } from "gpuix-svelte/test";
     '{"text":"soil","kinds":null,"unknown":[],"feeds":true}',
   );
   check("parse_query feeds:off", parse_query("feeds:off soil").feeds, false);
+
+  check("clip_caption captions a bare word", clip_caption(" dog "), "a photo of dog");
+  check(
+    "clip_caption leaves a caption alone",
+    clip_caption("A picture of a dog"),
+    "A picture of a dog",
+  );
 
   const terms = query_terms('Compost "worms"*');
   check(
@@ -1237,4 +1245,4 @@ if (recorder) {
   check("still idle after stop", rec.isRecording(), false);
 }
 
-finish("brain", recorder ? 222 : 217);
+finish("brain", recorder ? 224 : 219);
