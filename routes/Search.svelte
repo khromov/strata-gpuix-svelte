@@ -109,7 +109,7 @@
 			<div>Unknown kind “{parsed.unknown[0]}” — try kind:note, kind:link, kind:image or kind:audio.</div>
 		</div>
 	{/if}
-	<Scroller pad="0 20px 20px 20px" gap={8} testid="results">
+	<Scroller virtual estimate={100} pad="0 20px 20px 20px" testid="results">
 		{#if !q}
 			<EmptyState
 				icon="search"
@@ -120,7 +120,7 @@
 			<EmptyState icon="search" title="No matches" body="Try different words — or add what you were looking for." />
 		{:else}
 			{#each result.hits as hit (hit.item.id)}
-				<ItemCard item={hit.item} snippet={hit.snippet} signals={hit.signals} terms={result.terms} onopen={() => push(`/item/${hit.item.id}`)} />
+				<div class="row"><ItemCard item={hit.item} snippet={hit.snippet} signals={hit.signals} terms={result.terms} onopen={() => push(`/item/${hit.item.id}`)} /></div>
 			{/each}
 		{/if}
 	</Scroller>
@@ -130,6 +130,7 @@
 	.route { display: flex; flex-direction: column; flex-grow: 1; min-height: 0; }
 	.head { display: flex; flex-direction: row; align-items: center; gap: 10px; padding: 14px 20px 10px 20px; user-select: none; }
 	.grow { flex-grow: 1; }
+	.row { display: flex; flex-direction: column; width: 100%; padding-bottom: 8px; }
 	.summary { font-size: 12px; line-height: 16px; color: var(--inkFaint); }
 	.notice { display: flex; flex-direction: row; align-items: center; gap: 8px; margin: 0 20px 10px 20px; padding: 8px 12px; border-radius: 8px; font-size: 12px; line-height: 16px; user-select: none; background-color: var(--ochreSoft); color: var(--ochreInk); }
 </style>

@@ -12,6 +12,7 @@
 		"ml:install": "bun install --cwd ml",
 		"ml:doctor": "bun ml/doctor.ts",
 		"import-hn": "bun scripts/import-hn.ts",
+		"seed-load": "bun scripts/seed-load.ts",
 		"frames": "gpuix-svelte --bun scripts/frame-cost.ts"
 	},
 	"engines": {

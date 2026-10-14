@@ -21,6 +21,7 @@ bun run test            # test/brain.ts (data + native, no models) and test/smok
 bun run typecheck       # tsc, then svelte-check against GPUI's element types
 bun run build           # dist/Substrate.app, models and all (macOS)
 bun run import-hn       # pours today's Hacker News front page in
+bun run seed-load       # a 5000-item load-test brain in .data/load, beside the real one
 bun run frames          # GPUI draw times per route, against a copy of the data
 ```
 
@@ -92,7 +93,8 @@ keyword search still works — the Models panel says what to run.
                          lib/recorder-win.ts and lib/player-win.ts are the winmm equivalents,
                          over the shared FFI surface in lib/winmm.ts
   scripts/import-hn.ts   the Hacker News importer; frame-cost.ts prints GPUI draw times per route
-                         (bun run frames), against a copy of the data
+                         (bun run frames), against a copy of the data; seed-load.ts fills a
+                         load-test brain from Wikipedia, picsum.photos and `say`
   test/                  brain.ts (data + native, no models) and smoke.ts (headless UI)
   icon.svg / icon.png    the logo; the .app's icon is cut from the PNG
   .data/                 gitignored: substrate.sqlite, cache/, models/, tmp/

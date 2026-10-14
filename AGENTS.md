@@ -24,6 +24,9 @@ bun run ml:doctor    # loads all three models under Bun and runs one inference e
                      # run downloads ~380 MB into .data/models
 bun run build        # dist/substrate + dist/Substrate.app (macOS only)
 bun run import-hn    # pours the Hacker News front page into the real brain (scrape smoke test)
+bun run seed-load    # [count] [--fresh]: a copy of the brain plus 5000 generated items in
+                     # .data/load; open it with GPUIX_BRAIN_DIR=.data/load. Downloads stay
+                     # in .data/seed-corpus, so later runs are offline
 bun run frames       # draw-time stats per route, against a copy of the data (see below)
 ```
 
