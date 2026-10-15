@@ -18,12 +18,12 @@
 {/if}
 
 <style>
-	.menu { position: absolute; display: flex; flex-direction: column; gap: 2px; padding: 6px; border-radius: 10px; border-width: 1px; user-select: none; background-color: var(--raised); border-color: var(--borderStrong); }
-	.title { padding: 4px 8px 2px 8px; font-size: 10px; line-height: 14px; font-weight: 600; color: var(--inkFaint); }
-	.row { display: flex; flex-direction: row; align-items: center; gap: 10px; padding: 6px 8px; border-radius: 6px; cursor: pointer; }
+	.menu { position: absolute; display: flex; flex-direction: column; gap: 2px; padding: 6px; border-radius: 12px; border-width: 1px; user-select: none; background-color: var(--raised); border-color: var(--borderStrong); }
+	.title { padding: 4px 10px 2px 10px; font-size: 11px; line-height: 16px; font-weight: 600; color: var(--inkFaint); }
+	.row { display: flex; flex-direction: row; align-items: center; gap: 12px; padding: 8px 10px; border-radius: 7px; cursor: pointer; }
 	.row:hover { background-color: var(--hoverStrong); }
 	.row.active { background-color: var(--accentSoft); }
-	.label { font-family: Lilex; font-size: 12px; line-height: 16px; }
-	.hint { font-size: 12px; line-height: 16px; color: var(--inkMuted); }
-	.foot { padding: 4px 8px 2px 8px; font-size: 10px; line-height: 14px; color: var(--inkFaint); }
+	.label { font-family: Lilex; font-size: 13px; line-height: 18px; }
+	.hint { font-size: 13px; line-height: 18px; color: var(--inkMuted); }
+	.foot { padding: 4px 10px 2px 10px; font-size: 11px; line-height: 16px; color: var(--inkFaint); }
 </style>

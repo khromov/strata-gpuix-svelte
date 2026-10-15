@@ -53,12 +53,12 @@
 </div>
 
 <style>
-	.field { display: flex; flex-direction: column; gap: 5px; }
-	.label { font-size: 12px; line-height: 16px; font-weight: 600; user-select: none; color: var(--inkMuted); }
+	.field { display: flex; flex-direction: column; gap: 7px; min-width: 0; }
+	.label { font-size: 13px; line-height: 18px; font-weight: 600; user-select: none; color: var(--inkMuted); }
 	.row { display: flex; flex-direction: row; align-items: center; gap: 8px; }
-	.input { flex-grow: 1; padding: 7px 10px; border-radius: 6px; border-width: 1px; font-size: 13px; line-height: 18px; background-color: var(--field); border-color: var(--borderStrong); color: var(--ink); }
-	.input.mono { font-family: Lilex; font-size: 12px; }
+	.input { flex-grow: 1; min-width: 0; padding: 10px 12px; border-radius: 8px; border-width: 1px; font-size: 14px; line-height: 20px; background-color: var(--field); border-color: var(--borderStrong); color: var(--ink); }
+	.input.mono { font-family: Lilex; font-size: 13px; }
 	.input.focused { border-color: var(--accent); }
-	.masked { flex-grow: 1; padding: 7px 10px; border-radius: 6px; border-width: 1px; font-size: 13px; line-height: 18px; background-color: var(--sunken); border-color: var(--border); color: var(--inkMuted); }
-	.hint { font-size: 11px; line-height: 15px; color: var(--inkFaint); }
+	.masked { flex-grow: 1; min-width: 0; padding: 10px 12px; border-radius: 8px; border-width: 1px; font-size: 14px; line-height: 20px; background-color: var(--sunken); border-color: var(--border); color: var(--inkMuted); }
+	.hint { font-size: 12px; line-height: 16px; color: var(--inkFaint); }
 </style>

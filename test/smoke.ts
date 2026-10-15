@@ -304,7 +304,7 @@ check('and which feed it came from', painted().includes('Newsonaut'));
 push('/settings');
 await wait();
 await wait();
-check('settings carries the same switch', all_text().some((t) => t.includes("Covers the timeline, search, Ask and an item's Related list")));
+check('settings carries the same switch', find_test_id('settings-feeds') != null);
 // The tick is a filled box, so the palette's accent is what says the switch is on.
 check('and it carries what search just set', find_test_id('settings-feeds')?.children?.[0]?.style?.backgroundColor, DARK.accent);
 

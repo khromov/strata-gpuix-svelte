@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { ui, use_ticker } from '../lib/ui.svelte.ts';
 
-	let { value = null, height = 6 }: { value?: number | null; height?: number } = $props();
+	let { value = null, height = 8 }: { value?: number | null; height?: number } = $props();
 
 	const indeterminate = $derived(value == null);
 	// `left` is pixels-only in GPUI, so an unknown progress breathes in width instead of sweeping.

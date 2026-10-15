@@ -84,14 +84,16 @@
 
 <div class="route">
 	<div class="head">
-		<Field label="Add a feed" value={url} placeholder="https://example.com/feed.xml — or a blog's address" mono onchange={(v) => (url = v)} onsubmit={add} />
+		<div class="url">
+			<Field label="Add a feed" value={url} placeholder="https://example.com/feed.xml" mono onchange={(v) => (url = v)} onsubmit={add} />
+		</div>
 		<Button label={adding ? 'Subscribing…' : 'Subscribe'} icon="rss" variant="primary" disabled={adding || !url.trim()} onclick={add} testid="feed-add" />
-		{#if adding}<Spinner size={12} />{/if}
+		{#if adding}<Spinner size={14} />{/if}
 	</div>
 
-	<Scroller pad="0 20px 24px 20px" gap={12} testid="feeds">
+	<Scroller pad="0 24px 24px 24px" gap={14} testid="feeds">
 		{#if data.feeds.length === 0}
-			<EmptyState title="No feeds yet" body="Paste an RSS or Atom address above. Entries are ingested like any link you save — and stay out of search until you say otherwise in Settings." />
+			<EmptyState icon="rss" title="No feeds yet" />
 		{:else}
 			{#each data.feeds as feed (feed.id)}
 				<div
@@ -100,12 +102,12 @@
 					testId="feed-{feed.id}"
 				>
 					<div class="row">
-						<Icon name="rss" size={16} tone={feed.enabled ? 'accent' : 'faint'} />
+						<Icon name="rss" size={18} tone={feed.enabled ? 'accent' : 'faint'} />
 						<div class="titles">
 							<div class="name">{feed.title || host(feed)}</div>
 							<div class="sub">{host(feed)} · {data.feed_counts[feed.id] ?? 0} items · polled {when(feed.last_polled_at)}</div>
 						</div>
-						{#if busy === feed.id}<Spinner size={12} />{/if}
+						{#if busy === feed.id}<Spinner size={14} />{/if}
 						<Button label="Refresh" icon="refresh" small disabled={busy === feed.id} onclick={() => refresh(feed)} />
 						<Button label={expanded === feed.id ? 'Done' : 'Options'} small onclick={() => (expanded = expanded === feed.id ? null : feed.id)} />
 					</div>
@@ -116,33 +118,20 @@
 
 					{#if expanded === feed.id}
 						<div class="options">
-							<Toggle label="Enabled" hint="Unchecked, the feed keeps its items but stops polling." checked={feed.enabled} onchange={(v) => set(feed, { enabled: v })} />
-							<Toggle
-								label="Fetch the full article"
-								hint="Unchecked, only what the feed itself carries is stored — no page load per entry."
-								checked={feed.full_text}
-								onchange={(v) => set(feed, { full_text: v })}
-							/>
+							<Toggle label="Enabled" checked={feed.enabled} onchange={(v) => set(feed, { enabled: v })} />
+							<Toggle label="Fetch the full article" checked={feed.full_text} onchange={(v) => set(feed, { full_text: v })} />
 							<div class="setting">
 								<div class="label">Check for new entries</div>
 								<Segmented options={SCHEDULES} value={feed.schedule} onchange={(v) => set(feed, { schedule: v })} />
-								<div class="hint">Next {when_next(feed.schedule)}. A check missed while Substrate was closed runs at the next launch.</div>
+								<div class="hint">Next check {when_next(feed.schedule)}</div>
 							</div>
 							<div class="row">
-								<Field
-									label="Keep newest"
-									value={feed.retention_max == null ? '' : String(feed.retention_max)}
-									placeholder="all"
-									hint="Entries beyond this are deleted after a poll."
-									onchange={(v) => set_number(feed, 'retention_max', v)}
-								/>
-								<Field
-									label="Keep for (days)"
-									value={feed.retention_days == null ? '' : String(feed.retention_days)}
-									placeholder="forever"
-									hint="Anything you have edited is never pruned."
-									onchange={(v) => set_number(feed, 'retention_days', v)}
-								/>
+								<div class="cell">
+									<Field label="Keep newest" value={feed.retention_max == null ? '' : String(feed.retention_max)} placeholder="all" onchange={(v) => set_number(feed, 'retention_max', v)} />
+								</div>
+								<div class="cell">
+									<Field label="Keep for (days)" value={feed.retention_days == null ? '' : String(feed.retention_days)} placeholder="forever" onchange={(v) => set_number(feed, 'retention_days', v)} />
+								</div>
 							</div>
 							<div class="row">
 								<Button label="Search this feed" icon="inbox" small onclick={() => push(`/search?q=${encodeURIComponent(`feeds:on ${feed.title}`)}`)} />
@@ -169,16 +158,18 @@
 
 <style>
 	.route { display: flex; flex-direction: column; flex-grow: 1; min-height: 0; }
-	.head { display: flex; flex-direction: row; align-items: end; gap: 12px; padding: 16px 20px; }
-	.card { display: flex; flex-direction: column; gap: 10px; width: 100%; padding: 14px 16px; border-radius: 12px; border-width: 1px; background-color: var(--surface); border-color: var(--border); }
-	.row { display: flex; flex-direction: row; align-items: center; gap: 10px; }
-	.titles { display: flex; flex-direction: column; gap: 2px; flex-grow: 1; min-width: 0; }
-	.name { font-size: 14px; line-height: 19px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-	.sub { font-size: 11px; line-height: 15px; color: var(--inkFaint); }
-	.setting { display: flex; flex-direction: column; align-items: start; gap: 6px; }
-	.label { font-size: 12px; line-height: 16px; font-weight: 600; color: var(--inkMuted); }
-	.hint { font-size: 11px; line-height: 15px; color: var(--inkFaint); }
-	.options { display: flex; flex-direction: column; gap: 12px; padding-top: 6px; border-top-width: 1px; border-color: var(--divider); }
-	.problem { padding: 8px 10px; border-radius: 6px; font-size: 12px; line-height: 16px; background-color: var(--dangerSoft); color: var(--danger); }
+	.head { display: flex; flex-direction: row; align-items: end; gap: 12px; padding: 20px 24px; }
+	.url { display: flex; flex-direction: column; flex-grow: 1; max-width: 560px; min-width: 0; }
+	.card { display: flex; flex-direction: column; gap: 12px; width: 100%; padding: 16px 18px; border-radius: 14px; border-width: 1px; background-color: var(--surface); border-color: var(--border); }
+	.row { display: flex; flex-direction: row; align-items: center; gap: 12px; }
+	.cell { display: flex; flex-direction: column; flex-grow: 1; flex-basis: 0; min-width: 0; }
+	.titles { display: flex; flex-direction: column; gap: 3px; flex-grow: 1; min-width: 0; }
+	.name { font-size: 15px; line-height: 22px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+	.sub { font-size: 12px; line-height: 16px; color: var(--inkFaint); }
+	.setting { display: flex; flex-direction: column; align-items: start; gap: 8px; }
+	.label { font-size: 13px; line-height: 18px; font-weight: 600; color: var(--inkMuted); }
+	.hint { font-size: 12px; line-height: 16px; color: var(--inkFaint); }
+	.options { display: flex; flex-direction: column; gap: 14px; padding-top: 12px; border-top-width: 1px; border-color: var(--divider); }
+	.problem { padding: 10px 12px; border-radius: 8px; font-size: 13px; line-height: 18px; background-color: var(--dangerSoft); color: var(--danger); }
 	.grow { flex-grow: 1; }
 </style>

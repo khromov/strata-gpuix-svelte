@@ -122,14 +122,14 @@
 </script>
 
 <div class="search" class:focused>
-	<Icon name="search" size={15} tone="faint" />
+	<Icon name="search" size={17} tone="faint" />
 	<input
 		{@attach (n: ShadowNode) => {
 			node = n;
 			register('search', n);
 		}}
 		{value}
-		placeholder="Search your brain… (kind:note, kind:link, kind:image, kind:audio)"
+		placeholder="Search your brain…"
 		class="input"
 		onchange={(e) => change(e.value)}
 		onsubmit={(e) => submit(e.value)}
@@ -139,7 +139,7 @@
 		testId="search-input"
 	/>
 	{#if value}
-		<IconButton icon="x" tip="Clear search (Esc)" size={22} onclick={clear} />
+		<IconButton icon="x" tip="Clear search (Esc)" size={26} onclick={clear} />
 	{:else}
 		<div class="hint">⌘K</div>
 	{/if}
@@ -148,8 +148,8 @@
 <Portal><SearchSuggest /></Portal>
 
 <style>
-	.search { display: flex; flex-direction: row; align-items: center; gap: 8px; flex-grow: 1; min-width: 0; padding: 6px 8px 6px 12px; border-radius: 8px; border-width: 1px; background-color: var(--surface); border-color: var(--border); color: var(--inkFaint); }
+	.search { display: flex; flex-direction: row; align-items: center; gap: 10px; flex-grow: 1; min-width: 0; padding: 9px 10px 9px 14px; border-radius: 10px; border-width: 1px; background-color: var(--surface); border-color: var(--border); color: var(--inkFaint); }
 	.search.focused { border-color: var(--accent); background-color: var(--focusSurface); }
-	.input { flex-grow: 1; min-width: 0; font-size: 13px; line-height: 18px; color: var(--ink); }
-	.hint { padding: 1px 6px; border-radius: 4px; border-width: 1px; font-size: 10px; line-height: 14px; font-family: Lilex; user-select: none; border-color: var(--border); color: var(--inkFaint); }
+	.input { flex-grow: 1; min-width: 0; font-size: 14px; line-height: 20px; color: var(--ink); }
+	.hint { padding: 1px 7px; border-radius: 5px; border-width: 1px; font-size: 11px; line-height: 16px; font-family: Lilex; user-select: none; border-color: var(--border); color: var(--inkFaint); }
 </style>

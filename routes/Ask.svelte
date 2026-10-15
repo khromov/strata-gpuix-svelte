@@ -12,17 +12,12 @@
 </script>
 
 <div class="route">
-	<Scroller pad="20px 24px 12px 24px" gap={14} follow={chat.streaming} testid="chat">
+	<Scroller pad="24px 24px 14px 24px" gap={16} follow={chat.streaming} testid="chat">
 		{#if chat.messages.length === 0}
 			{#if configured}
-				<EmptyState icon="sparkles" title="Ask your brain" body="Questions are answered from your own notes, links, images and recordings, with citations you can open." />
+				<EmptyState icon="sparkles" title="Ask your brain" />
 			{:else}
-				<EmptyState
-					icon="sparkles"
-					title="Connect a model to ask questions"
-					body="Any OpenAI-compatible endpoint works: Ollama, LM Studio, OpenAI, OpenRouter. Answers cite the items they came from."
-					action={{ label: 'Open settings', icon: 'settings', onclick: () => push('/settings') }}
-				/>
+				<EmptyState icon="sparkles" title="Connect a model to ask questions" action={{ label: 'Open settings', icon: 'settings', onclick: () => push('/settings') }} />
 			{/if}
 		{:else}
 			{#each chat.messages as message (message.id)}
@@ -37,7 +32,7 @@
 				value={chat.draft}
 				minRows={1}
 				maxRows={6}
-				placeholder={configured ? 'Ask something… Enter sends, Shift+Enter for a new line' : 'Configure an LLM in Settings to ask questions'}
+				placeholder={configured ? 'Ask something…' : 'Connect a model in Settings to ask'}
 				readOnly={!configured}
 				class="input"
 				onchange={(e) => (chat.draft = e.value)}
@@ -60,8 +55,8 @@
 
 <style>
 	.route { display: flex; flex-direction: column; flex-grow: 1; min-height: 0; }
-	.composer { display: flex; flex-direction: row; align-items: end; gap: 8px; padding: 12px 24px 16px 24px; border-top-width: 1px; border-color: var(--divider); }
-	.input-wrap { flex-grow: 1; min-width: 0; padding: 8px 12px; border-radius: 10px; border-width: 1px; background-color: var(--surface); border-color: var(--border); }
+	.composer { display: flex; flex-direction: row; align-items: end; gap: 10px; padding: 14px 24px 18px 24px; border-top-width: 1px; border-color: var(--divider); }
+	.input-wrap { flex-grow: 1; min-width: 0; padding: 10px 14px; border-radius: 12px; border-width: 1px; background-color: var(--surface); border-color: var(--border); }
 	.input-wrap.focused { background-color: var(--focusSurface); border-color: var(--accent); }
-	.input { font-size: 14px; line-height: 21px; color: var(--ink); }
+	.input { font-size: 15px; line-height: 22px; color: var(--ink); }
 </style>

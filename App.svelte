@@ -85,7 +85,7 @@
 </div>
 
 <style>
-	.root { position: relative; display: flex; flex-direction: row; width: 100%; height: 100%; font-family: IBM Plex Sans; font-size: 13px; line-height: 20px; background-color: var(--bg); color: var(--ink); selection-color: var(--selection); }
+	.root { position: relative; display: flex; flex-direction: row; width: 100%; height: 100%; font-family: IBM Plex Sans; font-size: 14px; line-height: 21px; background-color: var(--bg); color: var(--ink); selection-color: var(--selection); }
 	.main { display: flex; flex-direction: column; flex-grow: 1; min-width: 0; min-height: 0; height: 100%; }
 	.page { display: flex; flex-direction: column; flex-grow: 1; min-height: 0; }
 </style>

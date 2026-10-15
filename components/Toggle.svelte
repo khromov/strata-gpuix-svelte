@@ -28,7 +28,7 @@
 	testId={testid}
 >
 	<div class="box" class:on={checked}>
-		{#if checked}<Icon name="check" size={13} tone="onAccent" />{/if}
+		{#if checked}<Icon name="check" size={14} tone="onAccent" />{/if}
 	</div>
 	<div class="text">
 		{#if label}<div class="label">{label}</div>{/if}
@@ -37,11 +37,11 @@
 </div>
 
 <style>
-	.toggle { display: flex; flex-direction: row; align-items: start; gap: 10px; padding: 4px 2px; border-radius: 8px; cursor: pointer; user-select: none; }
+	.toggle { display: flex; flex-direction: row; align-items: start; gap: 12px; padding: 6px 2px; border-radius: 8px; cursor: pointer; user-select: none; }
 	.toggle.disabled { cursor: default; opacity: 0.5; }
-	.box { display: flex; align-items: center; justify-content: center; width: 18px; height: 18px; margin-top: 1px; border-radius: 5px; border-width: 1px; background-color: var(--field); border-color: var(--borderStrong); }
+	.box { display: flex; align-items: center; justify-content: center; width: 20px; height: 20px; border-radius: 6px; border-width: 1px; background-color: var(--field); border-color: var(--borderStrong); }
 	.box.on { background-color: var(--accent); border-color: var(--accent); }
 	.text { display: flex; flex-direction: column; gap: 2px; flex-grow: 1; min-width: 0; }
-	.label { font-size: 13px; line-height: 18px; }
-	.hint { font-size: 11px; line-height: 15px; color: var(--inkFaint); }
+	.label { font-size: 14px; line-height: 20px; }
+	.hint { font-size: 12px; line-height: 16px; color: var(--inkFaint); }
 </style>

@@ -20,7 +20,7 @@
 		value={capture.text}
 		minRows={2}
 		maxRows={8}
-		placeholder="Pour something in — a thought, a link, anything. Enter saves, Shift+Enter for a new line."
+		placeholder="Pour something in — a thought, a link, anything"
 		class="text"
 		onchange={(e) => (capture.text = e.value)}
 		onsubmit={() => submit()}
@@ -52,23 +52,23 @@
 		<Button label="Import audio…" icon="audio" small onclick={pick_audio} disabled={caps ? !caps.filePicker.ok : false} />
 		<div class="grow"></div>
 		{#if caps && !caps.recorder.ok}
-			<div class="note"><Icon name="alert" size={12} tone="faint" /><div class="note-text">{caps.recorder.reason}</div></div>
+			<div class="note"><Icon name="alert" size={13} tone="faint" /><div class="note-text">{caps.recorder.reason}</div></div>
 		{/if}
 	</div>
 </div>
 
 <style>
-	.box { display: flex; flex-direction: column; gap: 10px; padding: 12px; border-radius: 12px; border-width: 1px; background-color: var(--surface); border-color: var(--border); }
+	.box { display: flex; flex-direction: column; gap: 12px; padding: 14px; border-radius: 14px; border-width: 1px; background-color: var(--surface); border-color: var(--border); }
 	.box.focused { border-color: var(--accent); background-color: var(--focusSurface); }
-	.text { font-size: 14px; line-height: 21px; padding: 4px 2px; color: var(--ink); }
-	.actions { display: flex; flex-direction: row; align-items: center; gap: 6px; flex-wrap: wrap; user-select: none; }
-	.sep { width: 1px; height: 18px; margin: 0 4px; background-color: var(--border); }
+	.text { font-size: 15px; line-height: 23px; padding: 4px 4px; color: var(--ink); }
+	.actions { display: flex; flex-direction: row; align-items: center; gap: 8px; flex-wrap: wrap; user-select: none; }
+	.sep { width: 1px; height: 22px; margin: 0 4px; background-color: var(--border); }
 	.grow { flex-grow: 1; }
-	.note { display: flex; flex-direction: row; align-items: center; gap: 5px; font-size: 11px; line-height: 14px; color: var(--inkFaint); }
+	.note { display: flex; flex-direction: row; align-items: center; gap: 6px; font-size: 12px; line-height: 16px; color: var(--inkFaint); }
 	.note-text { max-width: 320px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-	.rec { display: flex; flex-direction: row; align-items: center; gap: 10px; padding: 8px 10px; border-radius: 8px; user-select: none; background-color: var(--dangerSoft); color: var(--danger); }
+	.rec { display: flex; flex-direction: row; align-items: center; gap: 12px; padding: 10px 12px; border-radius: 10px; user-select: none; background-color: var(--dangerSoft); color: var(--danger); }
 	.dot { width: 10px; height: 10px; border-radius: 5px; background-color: var(--danger); }
-	.rec-label { font-size: 12px; line-height: 16px; font-weight: 600; font-family: Lilex; }
-	.meter { position: relative; flex-grow: 1; height: 6px; border-radius: 3px; overflow: hidden; background-color: var(--dangerWash); }
-	.level { position: absolute; top: 0; left: 0; height: 6px; border-radius: 3px; background-color: var(--danger); }
+	.rec-label { font-size: 13px; line-height: 18px; font-weight: 600; font-family: Lilex; }
+	.meter { position: relative; flex-grow: 1; height: 8px; border-radius: 4px; overflow: hidden; background-color: var(--dangerWash); }
+	.level { position: absolute; top: 0; left: 0; height: 8px; border-radius: 4px; background-color: var(--danger); }
 </style>

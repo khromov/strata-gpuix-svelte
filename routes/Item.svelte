@@ -188,7 +188,7 @@
 						{#if item.meta.site_name}<div>{item.meta.site_name}</div>{/if}
 						{#if feed && feed.title !== item.meta.site_name}<div>{feed.title}</div>{/if}
 						{#if fetched}<div>{fetched}</div>{/if}
-						{#if busy}<Spinner size={11} /><div>{status_text(item)}</div>{/if}
+						{#if busy}<Spinner size={12} /><div>{status_text(item)}</div>{/if}
 					</div>
 					<div class="title">{item.title || 'Untitled'}</div>
 					{#if item.kind === 'link' && item.source_url}
@@ -221,16 +221,8 @@
 				{#each blocks as block, i (i)}
 					<div class="block"><Markdown source={block} /></div>
 				{/each}
-				{#if !blocks.length && !busy}
-					<div class="row placeholder">
-						{#if item.kind === 'image'}
-							{vision
-								? 'No description yet — press Describe with LLM above.'
-								: 'Indexed for visual search: a text search finds this image by what is in it. A written description needs a vision model — set Base URL, Model and Vision model in Settings and images are described automatically — or press Edit to add your own notes.'}
-						{:else}
-							Nothing here yet.
-						{/if}
-					</div>
+				{#if !blocks.length && !busy && item.kind !== 'image'}
+					<div class="row placeholder">Nothing here yet.</div>
 				{/if}
 
 				{#if item.meta.describe_error}
@@ -253,25 +245,25 @@
 <style>
 	.route { display: flex; flex-direction: column; flex-grow: 1; min-height: 0; }
 	.missing { padding: 40px; text-align: center; color: var(--inkFaint); }
-	.bar { display: flex; flex-direction: row; align-items: center; gap: 6px; padding: 12px 24px; border-bottom-width: 1px; user-select: none; border-color: var(--divider); }
+	.bar { display: flex; flex-direction: row; align-items: center; gap: 8px; padding: 14px 24px; border-bottom-width: 1px; user-select: none; border-color: var(--divider); }
 	.grow { flex-grow: 1; }
-	.saved { padding-left: 8px; font-size: 12px; line-height: 16px; color: var(--inkFaint); }
-	.editor { display: flex; flex-direction: column; gap: 10px; flex-grow: 1; min-height: 0; padding: 16px 24px 24px 24px; }
-	.title-input { padding: 8px 10px; border-radius: 6px; border-width: 1px; font-size: 18px; line-height: 24px; font-weight: 600; background-color: var(--field); border-color: var(--borderStrong); color: var(--ink); }
-	.body-input { flex-grow: 1; min-height: 0; padding: 10px; border-radius: 6px; border-width: 1px; font-size: 14px; line-height: 22px; background-color: var(--field); border-color: var(--borderStrong); color: var(--ink); }
+	.saved { padding-left: 8px; font-size: 13px; line-height: 18px; color: var(--inkFaint); }
+	.editor { display: flex; flex-direction: column; gap: 12px; flex-grow: 1; min-height: 0; padding: 20px 24px 24px 24px; }
+	.title-input { padding: 10px 12px; border-radius: 8px; border-width: 1px; font-size: 20px; line-height: 28px; font-weight: 600; background-color: var(--field); border-color: var(--borderStrong); color: var(--ink); }
+	.body-input { flex-grow: 1; min-height: 0; padding: 12px; border-radius: 8px; border-width: 1px; font-size: 15px; line-height: 24px; background-color: var(--field); border-color: var(--borderStrong); color: var(--ink); }
 	.row { display: flex; flex-direction: column; width: 100%; padding-bottom: 16px; }
-	.header { gap: 8px; padding-top: 16px; }
-	.meta { display: flex; flex-direction: row; align-items: center; gap: 10px; font-size: 12px; line-height: 16px; user-select: none; color: var(--inkFaint); }
-	.title { font-size: 26px; line-height: 34px; font-weight: 700; }
-	.url { font-size: 12px; line-height: 16px; cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--info); }
-	.error { display: flex; flex-direction: row; align-items: center; gap: 10px; padding: 8px 12px; border-radius: 8px; font-size: 12px; line-height: 16px; background-color: var(--dangerSoft); color: var(--danger); }
+	.header { gap: 10px; padding-top: 20px; }
+	.meta { display: flex; flex-direction: row; align-items: center; gap: 12px; font-size: 13px; line-height: 18px; user-select: none; color: var(--inkFaint); }
+	.title { font-size: 28px; line-height: 36px; font-weight: 700; }
+	.url { font-size: 13px; line-height: 18px; cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--info); }
+	.error { display: flex; flex-direction: row; align-items: center; gap: 12px; padding: 10px 14px; border-radius: 10px; font-size: 13px; line-height: 18px; background-color: var(--dangerSoft); color: var(--danger); }
 	.error-text { flex-grow: 1; }
-	.hero { width: 100%; height: 380px; border-radius: 10px; background-color: var(--sunken); }
-	.og { width: 320px; height: 180px; border-radius: 8px; }
-	.summary { display: flex; flex-direction: column; gap: 6px; padding: 12px 14px; border-radius: 10px; background-color: var(--accentSoft); }
-	.summary-label { font-size: 11px; line-height: 14px; font-weight: 600; user-select: none; color: var(--accentDeep); }
-	.block { width: 100%; max-width: 760px; padding-bottom: 12px; }
-	.placeholder { font-size: 13px; line-height: 20px; color: var(--inkFaint); }
-	.related { gap: 6px; padding-top: 8px; }
-	.related-label { padding-bottom: 4px; font-size: 11px; line-height: 14px; font-weight: 600; user-select: none; color: var(--inkFaint); }
+	.hero { width: 100%; height: 380px; border-radius: 12px; background-color: var(--sunken); }
+	.og { width: 320px; height: 180px; border-radius: 10px; }
+	.summary { display: flex; flex-direction: column; gap: 8px; padding: 14px 16px; border-radius: 12px; background-color: var(--accentSoft); }
+	.summary-label { font-size: 12px; line-height: 16px; font-weight: 600; user-select: none; color: var(--accentDeep); }
+	.block { width: 100%; max-width: 760px; padding-bottom: 14px; }
+	.placeholder { font-size: 14px; line-height: 21px; color: var(--inkFaint); }
+	.related { gap: 8px; padding-top: 8px; }
+	.related-label { padding-bottom: 4px; font-size: 12px; line-height: 16px; font-weight: 600; user-select: none; color: var(--inkFaint); }
 </style>

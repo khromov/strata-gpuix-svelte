@@ -91,33 +91,29 @@
 
 <div class="route" onauxclick={(e: GpuixEvent) => open_menu(e, capture_actions())}>
 	<div class="head">
-		<Segmented options={FILTERS} value={active} onchange={choose} small />
+		<Segmented options={FILTERS} value={active} onchange={choose} />
 		<Toggle label="Include feeds" checked={feeds_on} onchange={toggle_feeds} testid="search-feeds" />
 		<div class="grow"></div>
-		{#if loading}<Spinner size={12} />{/if}
+		{#if loading}<Spinner size={14} />{/if}
 		<div class="summary">{summary}</div>
 	</div>
 	{#if result.degraded.includes('vector')}
 		<div class="notice">
-			<Icon name="alert" size={13} tone="text" />
-			<div>Semantic search is not ready yet — showing keyword matches only.</div>
+			<Icon name="alert" size={15} tone="text" />
+			<div>Keyword matches only — semantic search is still loading</div>
 		</div>
 	{/if}
 	{#if parsed.unknown.length}
 		<div class="notice">
-			<Icon name="alert" size={13} tone="text" />
+			<Icon name="alert" size={15} tone="text" />
 			<div>Unknown kind “{parsed.unknown[0]}” — try kind:note, kind:link, kind:image or kind:audio.</div>
 		</div>
 	{/if}
-	<Scroller virtual estimate={100} pad="0 20px 20px 20px" testid="results">
+	<Scroller virtual estimate={110} pad="0 24px 24px 24px" testid="results">
 		{#if !q}
-			<EmptyState
-				icon="search"
-				title="Search your brain"
-				body="Meaning, keywords and image content are searched together. Narrow with kind:note, kind:link, kind:image or kind:audio — alone or with words."
-			/>
+			<EmptyState icon="search" title="Search your brain" />
 		{:else if !loading && result.hits.length === 0}
-			<EmptyState icon="search" title="No matches" body="Try different words — or add what you were looking for." />
+			<EmptyState icon="search" title="No matches" />
 		{:else}
 			{#each result.hits as hit (hit.item.id)}
 				<div class="row"><ItemCard item={hit.item} snippet={hit.snippet} signals={hit.signals} terms={result.terms} onopen={() => push(`/item/${hit.item.id}`)} /></div>
@@ -128,9 +124,9 @@
 
 <style>
 	.route { display: flex; flex-direction: column; flex-grow: 1; min-height: 0; }
-	.head { display: flex; flex-direction: row; align-items: center; gap: 10px; padding: 14px 20px 10px 20px; user-select: none; }
+	.head { display: flex; flex-direction: row; align-items: center; gap: 14px; padding: 18px 24px 14px 24px; user-select: none; }
 	.grow { flex-grow: 1; }
-	.row { display: flex; flex-direction: column; width: 100%; padding-bottom: 8px; }
-	.summary { font-size: 12px; line-height: 16px; color: var(--inkFaint); }
-	.notice { display: flex; flex-direction: row; align-items: center; gap: 8px; margin: 0 20px 10px 20px; padding: 8px 12px; border-radius: 8px; font-size: 12px; line-height: 16px; user-select: none; background-color: var(--ochreSoft); color: var(--ochreInk); }
+	.row { display: flex; flex-direction: column; width: 100%; padding-bottom: 10px; }
+	.summary { font-size: 13px; line-height: 18px; color: var(--inkFaint); }
+	.notice { display: flex; flex-direction: row; align-items: center; gap: 10px; margin: 0 24px 12px 24px; padding: 10px 14px; border-radius: 10px; font-size: 13px; line-height: 18px; user-select: none; background-color: var(--ochreSoft); color: var(--ochreInk); }
 </style>

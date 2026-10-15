@@ -161,15 +161,15 @@ function md(t: Palette): GpuixTheme {
 			invalid: t.danger
 		},
 		metrics: {
-			mdTextSize: 14,
-			mdLineHeight: 22,
-			mdBlockGap: 12,
-			mdHeadingSizes: [22, 18, 16, 14],
-			mdHeadingLineHeights: [30, 26, 22, 21],
+			mdTextSize: 15,
+			mdLineHeight: 24,
+			mdBlockGap: 14,
+			mdHeadingSizes: [24, 20, 17, 15],
+			mdHeadingLineHeights: [32, 28, 24, 22],
 			mdInlineCodeRadius: 4,
-			mdCodeRadius: 6,
-			codeTextSize: 12,
-			codeLineHeight: 18
+			mdCodeRadius: 8,
+			codeTextSize: 13,
+			codeLineHeight: 20
 		}
 	};
 }

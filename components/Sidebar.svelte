@@ -28,7 +28,7 @@
 
 <div class="sidebar">
 	<div class="brand" hitbox="self" onclick={(e: GpuixEvent) => (is_secondary(e) ? show(e) : home())} onauxclick={show} testId="brand">
-		<div class="mark"><Icon name="leaf" size={18} tone="onAccent" /></div>
+		<div class="mark"><Icon name="leaf" size={19} tone="onAccent" /></div>
 		<div class="word">Substrate</div>
 	</div>
 
@@ -56,22 +56,20 @@
 		<StatusPill />
 		<div class="row">
 			<Segmented options={THEMES} value={theme.mode} onchange={set_mode} small />
-			<div class="grow"></div>
 			<NavItem label="Settings" icon="settings" path="/settings" />
 		</div>
 	</div>
 </div>
 
 <style>
-	.sidebar { display: flex; flex-direction: column; gap: 6px; width: 224px; min-width: 224px; height: 100%; padding: 18px 12px 14px 12px; border-right-width: 1px; user-select: none; background-color: var(--sidebar); border-color: var(--divider); }
-	.brand { display: flex; flex-direction: row; align-items: center; gap: 10px; margin-bottom: 6px; padding: 6px 8px; border-radius: 8px; cursor: pointer; }
+	.sidebar { display: flex; flex-direction: column; gap: 6px; width: 244px; min-width: 244px; height: 100%; padding: 18px 14px 16px 14px; border-right-width: 1px; user-select: none; background-color: var(--sidebar); border-color: var(--divider); }
+	.brand { display: flex; flex-direction: row; align-items: center; gap: 11px; margin-bottom: 8px; padding: 6px 8px; border-radius: 10px; cursor: pointer; }
 	.brand:hover { background-color: var(--hover); }
-	.mark { display: flex; align-items: center; justify-content: center; width: 30px; height: 30px; border-radius: 9px; background-color: var(--accent); color: var(--accentInk); }
-	.word { font-size: 20px; line-height: 26px; font-weight: 700; }
-	.nav { display: flex; flex-direction: column; gap: 2px; }
-	.section { padding: 12px 10px 4px 10px; font-size: 11px; line-height: 14px; font-weight: 600; color: var(--inkFaint); }
+	.mark { display: flex; align-items: center; justify-content: center; width: 32px; height: 32px; border-radius: 10px; background-color: var(--accent); color: var(--accentInk); }
+	.word { font-size: 21px; line-height: 28px; font-weight: 700; }
+	.nav { display: flex; flex-direction: column; gap: 3px; }
+	.section { padding: 14px 12px 6px 12px; font-size: 12px; line-height: 16px; font-weight: 600; color: var(--inkFaint); }
 	.spacer { flex-grow: 1; }
-	.footer { display: flex; flex-direction: column; gap: 10px; }
-	.row { display: flex; flex-direction: row; align-items: center; gap: 6px; }
-	.grow { flex-grow: 1; }
+	.footer { display: flex; flex-direction: column; gap: 12px; }
+	.row { display: flex; flex-direction: row; align-items: center; justify-content: space-between; gap: 6px; }
 </style>

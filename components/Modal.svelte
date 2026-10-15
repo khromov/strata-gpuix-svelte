@@ -44,8 +44,8 @@
 
 <style>
 	.scrim { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; user-select: none; background-color: var(--scrim); }
-	.dialog { display: flex; flex-direction: column; gap: 12px; width: 420px; padding: 20px; border-radius: 12px; border-width: 1px; background-color: var(--control); border-color: var(--borderStrong); color: var(--ink); }
-	.title { font-size: 16px; line-height: 22px; font-weight: 600; }
-	.body { font-size: 13px; line-height: 20px; color: var(--inkMuted); }
-	.actions { display: flex; flex-direction: row; justify-content: end; gap: 8px; padding-top: 4px; }
+	.dialog { display: flex; flex-direction: column; gap: 14px; width: 440px; padding: 24px; border-radius: 14px; border-width: 1px; background-color: var(--control); border-color: var(--borderStrong); color: var(--ink); }
+	.title { font-size: 18px; line-height: 24px; font-weight: 600; }
+	.body { font-size: 14px; line-height: 21px; color: var(--inkMuted); }
+	.actions { display: flex; flex-direction: row; justify-content: end; gap: 10px; padding-top: 6px; }
 </style>

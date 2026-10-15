@@ -5,11 +5,11 @@
 	import Icon from './Icon.svelte';
 	import Modal from './Modal.svelte';
 
-	const WIDTH = 240;
+	const WIDTH = 256;
 	const MARGIN = 8;
-	const ROW = 28;
+	const ROW = 32;
 	const SEPARATOR = 9;
-	const TITLE = 20;
+	const TITLE = 24;
 	const FRAME = 14;
 
 	let confirming = $state<{ action: MenuAction } | null>(null);
@@ -90,7 +90,7 @@
 						onclick={() => choose(row.action)}
 						testId="menu-{row.action.label}"
 					>
-						{#if row.action.icon}<Icon name={row.action.icon} size={13} tone={row.action.danger ? 'danger' : 'faint'} />{/if}
+						{#if row.action.icon}<Icon name={row.action.icon} size={15} tone={row.action.danger ? 'danger' : 'faint'} />{/if}
 						<div class="label">{row.action.label}</div>
 						{#if row.action.hint}<div class="hint">{row.action.hint}</div>{/if}
 					</div>
@@ -112,14 +112,14 @@
 
 <style>
 	.backdrop { position: absolute; inset: 0; }
-	.menu { position: absolute; display: flex; flex-direction: column; width: 240px; padding: 6px; border-radius: 10px; border-width: 1px; user-select: none; background-color: var(--raised); border-color: var(--borderStrong); }
-	.head { padding: 3px 8px; font-size: 10px; line-height: 14px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--inkFaint); }
+	.menu { position: absolute; display: flex; flex-direction: column; width: 256px; padding: 6px; border-radius: 12px; border-width: 1px; user-select: none; background-color: var(--raised); border-color: var(--borderStrong); }
+	.head { padding: 4px 9px; font-size: 11px; line-height: 16px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--inkFaint); }
 	.rule { height: 1px; margin: 4px 6px; background-color: var(--divider); }
-	.row { display: flex; flex-direction: row; align-items: center; gap: 9px; padding: 6px 8px; border-radius: 6px; cursor: pointer; color: var(--ink); }
+	.row { display: flex; flex-direction: row; align-items: center; gap: 10px; padding: 7px 9px; border-radius: 7px; cursor: pointer; color: var(--ink); }
 	.row:hover { background-color: var(--hoverStrong); }
 	.row.active { background-color: var(--accentSoft); }
 	.row.danger { color: var(--danger); }
 	.row.disabled { opacity: 0.4; cursor: default; }
-	.label { flex-grow: 1; font-size: 13px; line-height: 16px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-	.hint { font-size: 11px; line-height: 16px; color: var(--inkFaint); }
+	.label { flex-grow: 1; font-size: 14px; line-height: 18px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+	.hint { font-size: 12px; line-height: 18px; color: var(--inkFaint); }
 </style>

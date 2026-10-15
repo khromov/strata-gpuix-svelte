@@ -33,13 +33,13 @@
 	}}
 	testId={testid}
 >
-	{#if icon}<Icon name={icon} size={small ? 14 : 16} tone={ICON_TONE[variant] ?? 'ink'} />{/if}
+	{#if icon}<Icon name={icon} size={small ? 15 : 17} tone={ICON_TONE[variant] ?? 'ink'} />{/if}
 	{#if label}<div class="label">{label}</div>{/if}
 </div>
 
 <style>
-	.btn { display: flex; flex-direction: row; align-items: center; justify-content: center; gap: 6px; padding: 7px 12px; border-radius: 6px; border-width: 1px; font-size: 13px; line-height: 18px; font-weight: 500; cursor: pointer; user-select: none; white-space: nowrap; }
-	.btn.small { padding: 4px 9px; font-size: 12px; line-height: 16px; }
+	.btn { display: flex; flex-direction: row; align-items: center; justify-content: center; gap: 7px; padding: 9px 15px; border-radius: 8px; border-width: 1px; font-size: 14px; line-height: 20px; font-weight: 500; cursor: pointer; user-select: none; white-space: nowrap; }
+	.btn.small { padding: 6px 11px; font-size: 13px; line-height: 18px; }
 	.btn.disabled { opacity: 0.45; cursor: default; }
 
 	.btn.primary { background-color: var(--accent); border-color: var(--accent); color: var(--accentInk); }

@@ -60,7 +60,7 @@
 	onauxclick={show}
 	testId="item-{item.id}"
 >
-	<Thumb {item} size={compact ? 40 : 52} />
+	<Thumb {item} size={compact ? 44 : 60} />
 	<div class="body">
 		{#if title_mark}
 			<div class="title" highlight={title_mark}>{title}</div>
@@ -83,19 +83,19 @@
 					onclick={(e: GpuixEvent) => (is_secondary(e) ? open_menu(e, feed_actions(feed), feed.title) : push('/feeds'))}
 					onauxclick={(e: GpuixEvent) => open_menu(e, feed_actions(feed), feed.title)}
 				>
-					<Icon name="rss" size={11} tone="faint" />
+					<Icon name="rss" size={12} tone="faint" />
 					<div class="feed-name">{feed.title}</div>
 				</div>
 			{/if}
 			{#if busy}
-				<Spinner size={11} />
+				<Spinner size={12} />
 				<div class="status">{status_text(item)}</div>
 			{:else if failed}
 				<div class="error">{item.error ?? 'failed'}</div>
 			{/if}
 			{#each signals ?? [] as signal (signal)}
 				<div class="signal {signal}">
-					{#if signal === 'clip'}<Icon name="sparkles" size={11} tone="image" />{/if}
+					{#if signal === 'clip'}<Icon name="sparkles" size={12} tone="image" />{/if}
 					<div class="signal-text">{SIGNAL[signal] ?? signal}</div>
 				</div>
 			{/each}
@@ -110,18 +110,18 @@
 </div>
 
 <style>
-	.card { display: flex; flex-direction: row; align-items: start; gap: 12px; padding: 12px; border-width: 1px; border-radius: 10px; cursor: pointer; user-select: none; background-color: var(--surface); border-color: var(--border); }
-	.card.compact { padding: 8px 10px; gap: 10px; align-items: center; }
+	.card { display: flex; flex-direction: row; align-items: start; gap: 14px; padding: 14px; border-width: 1px; border-radius: 12px; cursor: pointer; user-select: none; background-color: var(--surface); border-color: var(--border); }
+	.card.compact { padding: 10px 12px; gap: 12px; align-items: center; }
 	.card:hover { background-color: var(--raised); border-color: var(--borderStrong); }
 	.card.failed { border-color: var(--dangerBorder); }
-	.body { display: flex; flex-direction: column; gap: 4px; flex-grow: 1; min-width: 0; }
-	.title { font-size: 14px; line-height: 20px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-	.snippet { font-size: 13px; line-height: 18px; line-clamp: 3; color: var(--inkMuted); }
-	.meta { display: flex; flex-direction: row; align-items: center; gap: 8px; font-size: 11px; line-height: 16px; color: var(--inkFaint); }
+	.body { display: flex; flex-direction: column; gap: 5px; flex-grow: 1; min-width: 0; }
+	.title { font-size: 15px; line-height: 22px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+	.snippet { font-size: 14px; line-height: 20px; line-clamp: 3; color: var(--inkMuted); }
+	.meta { display: flex; flex-direction: row; align-items: center; gap: 10px; font-size: 12px; line-height: 18px; color: var(--inkFaint); }
 	.error { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--danger); }
-	.feed { display: flex; flex-direction: row; align-items: center; gap: 4px; max-width: 160px; cursor: pointer; }
+	.feed { display: flex; flex-direction: row; align-items: center; gap: 5px; max-width: 180px; cursor: pointer; }
 	.feed-name { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--inkFaint); }
-	.signal { display: flex; flex-direction: row; align-items: center; gap: 4px; padding: 0 6px; border-width: 1px; border-radius: 4px; border-color: var(--border); color: var(--inkMuted); }
+	.signal { display: flex; flex-direction: row; align-items: center; gap: 4px; padding: 0 7px; border-width: 1px; border-radius: 5px; border-color: var(--border); color: var(--inkMuted); }
 	.signal.clip { background-color: var(--plumSoft); border-color: var(--plumBorder); color: var(--plum); font-weight: 600; }
 	.actions { display: flex; flex-direction: row; align-items: center; }
 </style>
