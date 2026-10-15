@@ -1,7 +1,7 @@
-import { create_llm, LlmError, type Message } from './llm.ts';
+import { LlmError, type Message } from './llm.ts';
+import type { Llms } from './llms.ts';
 import { clip_snippet } from './rank.ts';
 import type { Search } from './search.ts';
-import type { Settings } from './settings.ts';
 import type { Kind } from './store.ts';
 
 const SYSTEM = `You are Substrate, a personal second brain. Answer the question using only the numbered sources from the user's own notes, links, images and recordings. Cite a source as [n] right after the fact it supports. If the sources do not contain the answer, say so plainly rather than guessing. Be concise; use markdown.`;
@@ -31,12 +31,12 @@ export interface Answer {
 }
 
 export async function ask(
-	{ search, settings }: { search: Search; settings: Settings },
+	{ search, llms }: { search: Search; llms: Llms },
 	question: string,
 	{ k = 8, max_chars = 12_000, history = [], signal, on_token }: AskOptions = {}
 ): Promise<Answer> {
-	const config = settings.llm_config();
-	if (!config) throw new LlmError('no LLM configured — set a base URL and model in Settings', { code: 'NOT_CONFIGURED' });
+	const llm = llms.text();
+	if (!llm) throw new LlmError(llms.caps().llm.reason ?? 'no language model', { code: 'NOT_CONFIGURED' });
 
 	const sources: Source[] = [];
 	const texts: string[] = [];
@@ -66,7 +66,12 @@ export async function ask(
 		{ role: 'user', content: `${context}\n\nQuestion: ${question}` }
 	];
 
-	const answer = await create_llm(config).chat(messages, { stream: true, signal, onDelta: on_token });
-	const cited = [...new Set([...answer.matchAll(/\[(\d+)\]/g)].map((m) => Number(m[1])).filter((n) => n >= 1 && n <= sources.length))];
-	return { answer, sources, cited };
+	const answer = await llm.chat(messages, { stream: true, signal, onDelta: on_token });
+	return { answer, sources, cited: cited_sources(answer, sources.length) };
+}
+
+/** `[2]` and `[1, 3]` alike: small models, Gemma among them, tend to cite in lists. */
+export function cited_sources(answer: string, count: number): number[] {
+	const ns = [...answer.matchAll(/\[(\d+(?:\s*,\s*\d+)*)\]/g)].flatMap((m) => m[1].split(',').map(Number));
+	return [...new Set(ns.filter((n) => n >= 1 && n <= count))];
 }

@@ -7,7 +7,8 @@
 	import Spinner from '../components/Spinner.svelte';
 	import { data, display_title, format_bytes, get_app, item_by_id, status_text } from '../lib/data.svelte.ts';
 	import { include_feeds, set_include_feeds } from '../lib/feed-filter.svelte.ts';
-	import { create_llm } from '../lib/llm.ts';
+	import { create_llm, type LlmProvider } from '../lib/llm.ts';
+	import { GEMMA_BYTES, GEMMA_ID, GEMMA_NAME } from '../lib/llm-local.ts';
 	import { MODEL_IDS, type ModelName } from '../lib/ml-client.ts';
 	import type { SettingKey } from '../lib/settings.ts';
 	import { reveal } from '../lib/shell.ts';
@@ -56,6 +57,21 @@
 		}
 	}
 
+	function choose_provider(provider: LlmProvider) {
+		if (settings.from_env('llm.provider')) return toast('Set by GPUIX_BRAIN_LLM_PROVIDER', 'info');
+		settings.set('llm.provider', provider);
+	}
+
+	const gemma = $derived(data.llm);
+	const gemma_label = $derived.by(() => {
+		if (gemma.state === 'downloading') return `downloading${gemma.progress != null ? ` ${Math.round(gemma.progress)}%` : ''}`;
+		if (gemma.state === 'ready') return gemma.rss ? `ready · ${format_bytes(gemma.rss)}` : 'ready';
+		if (gemma.state === 'unloaded') return gemma.downloaded ? 'not loaded' : 'not downloaded';
+		return STATE_LABEL[gemma.state] ?? gemma.state;
+	});
+	const load_gemma = () => app.local.load().catch((err) => toast(err.message, 'error'));
+	const unload_gemma = () => app.local.unload().catch((err) => toast(err.message, 'error'));
+
 	let confirming = $state(false);
 
 	function rebuild(ok: boolean) {
@@ -90,6 +106,10 @@
 		{ value: 'dark', icon: 'moon', label: 'Dark' },
 		{ value: 'system', icon: 'monitor', label: 'System' }
 	];
+	const PROVIDERS: Array<{ value: LlmProvider; icon: IconName; label: string }> = [
+		{ value: 'local', icon: 'monitor', label: 'On this computer' },
+		{ value: 'openai', icon: 'link', label: 'OpenAI-compatible endpoint' }
+	];
 	const STATE_LABEL: Record<string, string> = { unloaded: 'not loaded', downloading: 'downloading', loading: 'loading', ready: 'ready', error: 'error' };
 </script>
 
@@ -97,16 +117,47 @@
 	<Scroller pad="24px 28px 36px 28px" gap={24}>
 		<div class="section">
 			<div class="heading">Language model</div>
-			<Field label="Base URL" value={llm.baseUrl} placeholder="http://localhost:11434" mono hint={settings.from_env('llm.baseUrl') ? 'set by GPUIX_BRAIN_LLM_URL' : ''} onchange={(v) => save('llm.baseUrl', 'baseUrl', v)} onsubmit={test_connection} />
-			<Field label="API key" value={llm.apiKey} placeholder="optional for local servers" secret hint={settings.from_env('llm.apiKey') ? 'set by GPUIX_BRAIN_LLM_KEY' : ''} onchange={(v) => save('llm.apiKey', 'apiKey', v)} />
-			<div class="row">
-				<div class="cell"><Field label="Model" value={llm.model} placeholder="llama3.2, gpt-4o-mini, …" mono onchange={(v) => save('llm.model', 'model', v)} onsubmit={test_connection} /></div>
-				<div class="cell"><Field label="Vision model" value={llm.visionModel} placeholder="optional — llava, gpt-4o, …" mono onchange={(v) => save('llm.visionModel', 'visionModel', v)} /></div>
+			<div class="setting">
+				<Segmented options={PROVIDERS} value={data.provider} onchange={choose_provider} />
 			</div>
-			<div class="actions">
-				<Button label={testing ? 'Testing…' : 'Test connection'} icon="check" variant="primary" disabled={testing} onclick={test_connection} />
-				{#if testing}<Spinner size={14} />{/if}
-			</div>
+			{#if data.provider === 'local'}
+				<div class="model" testId="settings-gemma">
+					<div class="model-text">
+						<div class="model-name">{GEMMA_NAME}</div>
+						<div class="model-note">{GEMMA_ID}</div>
+						{#if gemma.state === 'downloading'}
+							<ProgressBar value={gemma.progress ?? null} />
+						{/if}
+						{#if gemma.state === 'error'}
+							<div class="problem">{gemma.error}</div>
+						{/if}
+					</div>
+					<div class="model-state {gemma.state}">
+						{#if gemma.state === 'loading' || gemma.state === 'downloading'}<Spinner size={12} />{/if}
+						<div>{gemma_label}</div>
+					</div>
+					{#if app.local.available && (gemma.state === 'unloaded' || gemma.state === 'error')}
+						<Button label={gemma.downloaded ? 'Load' : 'Download'} icon={gemma.downloaded ? null : 'download'} small onclick={load_gemma} />
+					{:else if gemma.state === 'ready'}
+						<Button label="Unload" small onclick={unload_gemma} />
+					{/if}
+				</div>
+				{#if !app.local.available}
+					<div class="problem">{app.local.reason}</div>
+				{/if}
+				<div class="hint">Questions, summaries and image descriptions stay on this computer and run on its GPU. The first use downloads {format_bytes(GEMMA_BYTES)}; loaded, the model takes about 6 GB of memory, and it unloads after ten idle minutes.</div>
+			{:else}
+				<Field label="Base URL" value={llm.baseUrl} placeholder="http://localhost:11434" mono hint={settings.from_env('llm.baseUrl') ? 'set by GPUIX_BRAIN_LLM_URL' : ''} onchange={(v) => save('llm.baseUrl', 'baseUrl', v)} onsubmit={test_connection} />
+				<Field label="API key" value={llm.apiKey} placeholder="optional for local servers" secret hint={settings.from_env('llm.apiKey') ? 'set by GPUIX_BRAIN_LLM_KEY' : ''} onchange={(v) => save('llm.apiKey', 'apiKey', v)} />
+				<div class="row">
+					<div class="cell"><Field label="Model" value={llm.model} placeholder="llama3.2, gpt-4o-mini, …" mono onchange={(v) => save('llm.model', 'model', v)} onsubmit={test_connection} /></div>
+					<div class="cell"><Field label="Vision model" value={llm.visionModel} placeholder="optional — llava, gpt-4o, …" mono onchange={(v) => save('llm.visionModel', 'visionModel', v)} /></div>
+				</div>
+				<div class="actions">
+					<Button label={testing ? 'Testing…' : 'Test connection'} icon="check" variant="primary" disabled={testing} onclick={test_connection} />
+					{#if testing}<Spinner size={14} />{/if}
+				</div>
+			{/if}
 		</div>
 
 		<div class="section">

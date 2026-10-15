@@ -15,11 +15,13 @@ import { fileURLToPath } from "node:url";
 import { find_ranges } from "gpuix-svelte";
 import { parse_appearance } from "../lib/appearance.ts";
 import { create_app } from "../lib/app.ts";
+import { cited_sources } from "../lib/ask.ts";
 import { markdown_blocks } from "../lib/blocks.ts";
 import { chunk_markdown } from "../lib/chunk.ts";
 import { normalize_base_url, parse_sse } from "../lib/llm.ts";
+import { GEMMA_NAME, gemma_messages, LocalLlm } from "../lib/llm-local.ts";
 import { MlClient } from "../lib/ml-client.ts";
-import { MlStub } from "../lib/ml-stub.ts";
+import { LocalStub, MlStub } from "../lib/ml-stub.ts";
 import {
   chunk_body,
   clip_caption,
@@ -639,7 +641,18 @@ const dir = mkdtempSync(join(tmpdir(), "substrate-test-"));
     app.get_item(audio.id)!.body.startsWith("Stub transcript"),
   );
   check("image ready", app.get_item(image.id)!.status, "ready");
-  check("chunk vectors indexed", app.vectors.size, 3);
+  check(
+    "the on-device model describes an imported image",
+    app.get_item(image.id)!.body,
+    "A stub description of the picture.",
+  );
+  check(
+    "and is named as its author",
+    app.get_item(image.id)!.meta.described_by,
+    GEMMA_NAME,
+  );
+  // Note, link and transcript, plus the image's description.
+  check("chunk vectors indexed", app.vectors.size, 4);
   check("image vector indexed", app.images.size, 1);
   check("chunk blob is 768 floats", app.store.chunks_of(note.id).length, 1);
 
@@ -702,10 +715,10 @@ const dir = mkdtempSync(join(tmpdir(), "substrate-test-"));
     (await app.search("snails copper")).hits[0]?.item.id,
     note.id,
   );
-  check("vector count stable after update", app.vectors.size, 3);
+  check("vector count stable after update", app.vectors.size, 4);
 
   check("delete returns true", app.delete_item(note.id), true);
-  check("delete drops vectors", app.vectors.size, 2);
+  check("delete drops vectors", app.vectors.size, 3);
   check("delete drops fts", (await app.search("snails")).hits.length, 0);
 
   // Added and deleted again, so the counts the restart block asserts are unchanged.
@@ -845,7 +858,7 @@ const dir = mkdtempSync(join(tmpdir(), "substrate-test-"));
     ml: new MlStub(),
     fetch: fixture_fetch,
   });
-  check("restart restores vectors", app.vectors.size, 5);
+  check("restart restores vectors", app.vectors.size, 6);
   check("restart restores image vectors", app.images.size, 1);
   check("restart keeps items", app.snapshot().counts.total, 8);
   check(
@@ -1182,6 +1195,142 @@ const feed_fetch: Fetcher = async (url) => {
   app.close();
 }
 
+// --- the on-device LLM: message shaping, the provider choice, Ask through it, and
+// LocalLlm against a fake worker
+{
+  const { messages, images } = gemma_messages([
+    { role: "system", content: "Be brief." },
+    {
+      role: "user",
+      content: [
+        { type: "text", text: "What is this?" },
+        { type: "image_url", image_url: { url: "data:image/webp;base64,AAAA" } },
+      ],
+    },
+  ]);
+  check("plain content passes through", messages[0].content, "Be brief.");
+  check(
+    "images go before the words",
+    JSON.stringify(messages[1].content),
+    '[{"type":"image"},{"type":"text","text":"What is this?"}]',
+  );
+  check("and their urls in order", images.join(","), "data:image/webp;base64,AAAA");
+  check(
+    "citations in lists count, out-of-range ones do not",
+    cited_sources("Turn it often [1, 3]. Keep it damp [2][9].", 3).join(","),
+    "1,3,2",
+  );
+}
+{
+  const local = new LocalStub();
+  const app = await create_app({
+    data_dir: mkdtempSync(join(tmpdir(), "substrate-llm-")),
+    ml: new MlStub(),
+    local,
+    fetch: fixture_fetch,
+  });
+  check("gemma is the default", app.settings.provider(), "local");
+  check("and can read images", app.llms.caps().vision.ok, true);
+  const note = app.add_note({ body: "Worms love coffee grounds in the compost." });
+  await app.ingest.idle();
+  let streamed = "";
+  const answer = await app.ask("what do worms love?", {
+    on_token: (_delta, full) => (streamed = full),
+  });
+  check("ask answers through gemma", answer.answer, "Your notes cover this [1].");
+  check("streaming as it goes", streamed, answer.answer);
+  check("with the note as its source", answer.sources[0]?.item_id, note.id);
+  check("and the citation parsed", answer.cited.join(","), "1");
+  await app.summarize(note.id);
+  check(
+    "summaries are gemma's too",
+    app.get_item(note.id)!.meta.summarized_by,
+    GEMMA_NAME,
+  );
+
+  app.settings.set("llm.baseUrl", "http://localhost:11434");
+  app.settings.set("llm.model", "llama3.2");
+  check(
+    "an endpoint set up before the choice keeps answering",
+    app.settings.provider(),
+    "openai",
+  );
+  check("the endpoint describes images only with a vision model", app.llms.caps().vision.ok, false);
+  app.settings.set("llm.provider", "local");
+  check("an explicit choice wins", app.settings.provider(), "local");
+  check("and gemma answers again", app.llms.text()?.model, GEMMA_NAME);
+  app.close();
+}
+{
+  const app = await create_app({
+    data_dir: mkdtempSync(join(tmpdir(), "substrate-llm-off-")),
+    ml: new MlStub({ available: false, reason: "ML disabled for the test" }),
+    fetch: fixture_fetch,
+  });
+  check("without the ML package gemma is off", app.llms.caps().llm.reason, "ML disabled for the test");
+  check(
+    "and ask says why",
+    await app.ask("anything").catch((e: Failure) => e.message),
+    "ML disabled for the test",
+  );
+  app.close();
+}
+{
+  const states: string[] = [];
+  const llm = new LocalLlm({
+    worker_path: fileURLToPath(new URL("./fake-llm-worker.ts", import.meta.url)),
+    models_dir: mkdtempSync(join(tmpdir(), "substrate-gemma-")),
+    on_status: (s) => states.push(s.state),
+  });
+  check("nothing runs before the first request", llm.status.state, "unloaded");
+  check("and nothing is downloaded", llm.status.downloaded, false);
+  let streamed = "";
+  const text = await llm.chat([{ role: "user", content: "hello" }], {
+    onDelta: (_delta, full) => (streamed = full),
+  });
+  check("the first request starts the worker", text, "echo: hello");
+  check("tokens stream back", streamed, "echo: hello");
+  check("download progress is forwarded", states.includes("downloading"));
+  check("then ready", llm.status.state, "ready");
+  check("and downloaded", llm.status.downloaded, true);
+
+  const controller = new AbortController();
+  const stopped = await llm
+    .chat([{ role: "user", content: "__slow__" }], {
+      signal: controller.signal,
+      onDelta: () => controller.abort(),
+    })
+    .catch((e: Error) => e.name);
+  check("stopping rejects as an abort", stopped, "AbortError");
+  check(
+    "and the worker goes on",
+    await llm.chat([{ role: "user", content: "again" }]),
+    "echo: again",
+  );
+
+  const code = await llm
+    .chat([{ role: "user", content: "__crash__" }])
+    .catch((e: Failure) => e.code);
+  check("a crash rejects the request", code, "WORKER_CRASHED");
+  check("and shows as an error", llm.status.state, "error");
+  check(
+    "the next request starts it again",
+    await llm.chat([{ role: "user", content: "back" }]),
+    "echo: back",
+  );
+
+  await llm.chat([{ role: "user", content: "__idle__" }]);
+  await new Promise((r) => setTimeout(r, 300));
+  check("an idle exit is an unload, not a crash", llm.status.state, "unloaded");
+  check(
+    "and the next request brings it back",
+    await llm.chat([{ role: "user", content: "later" }]),
+    "echo: later",
+  );
+  await llm.unload();
+  check("unload ends the process", llm.status.state, "unloaded");
+}
+
 // --- MlClient against the fake worker
 {
   const client = new MlClient({
@@ -1245,4 +1394,4 @@ if (recorder) {
   check("still idle after stop", rec.isRecording(), false);
 }
 
-finish("brain", recorder ? 224 : 219);
+finish("brain", recorder ? 258 : 253);

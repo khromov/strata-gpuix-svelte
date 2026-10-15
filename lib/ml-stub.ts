@@ -1,10 +1,12 @@
 /**
- * The same surface as MlClient with deterministic hash vectors, so tests and
- * screenshot runs never touch a model, and the app still opens when the ML
- * dependencies are missing.
+ * The same surface as MlClient (and LocalLlm) with deterministic hash vectors and
+ * canned replies, so tests and screenshot runs never touch a model, and the app
+ * still opens when the ML dependencies are missing.
  */
 
 import { basename } from 'node:path';
+import type { ChatOptions, Message } from './llm.ts';
+import type { LocalLike, LocalStatus } from './llm-local.ts';
 import { DIMS, MODEL_IDS, MODEL_NAMES, MlError } from './ml-client.ts';
 import type { MlLike, MlStatus, ModelName, ModelState, ModelStatus, Thresholds, TranscribeOptions, TranscribeResult, WorkerResults } from './ml-client.ts';
 import { normalize } from './vectors.ts';
@@ -137,3 +139,50 @@ export class MlStub implements MlLike {
 }
 
 export { MODEL_NAMES };
+
+/**
+ * The on-device LLM without a model: it streams a fixed reply word by word, citing the
+ * first source when the prompt has any, and says what an image is when given one.
+ */
+export class LocalStub implements LocalLike {
+	status: LocalStatus;
+	available: boolean;
+	reason: string | null;
+	on_status: (status: LocalStatus) => void;
+	/** Every message list `chat` was given, for tests. */
+	calls: Message[][] = [];
+
+	constructor({ available = true, reason = null, on_status = () => {} }: { available?: boolean; reason?: string | null; on_status?: (s: LocalStatus) => void } = {}) {
+		this.available = available;
+		this.reason = reason;
+		this.on_status = on_status;
+		this.status = { state: available ? 'ready' : 'error', progress: available ? 100 : null, error: reason, downloaded: available, rss: null };
+	}
+
+	async load() {
+		if (!this.available) throw new MlError(this.reason ?? 'LLM unavailable', { code: 'ML_UNAVAILABLE' });
+	}
+
+	async chat(messages: Message[], { onDelta, signal }: ChatOptions = {}): Promise<string> {
+		await this.load();
+		this.calls.push(messages);
+		const last = messages.at(-1)?.content ?? '';
+		const text =
+			typeof last !== 'string'
+				? 'A stub description of the picture.'
+				: /^Sources:\n\n\[1\]/.test(last)
+					? 'Your notes cover this [1].'
+					: 'Nothing in your notes covers that.';
+		let full = '';
+		for (const word of text.split(/(?<= )/)) {
+			signal?.throwIfAborted();
+			full += word;
+			onDelta?.(word, full);
+			await Promise.resolve();
+		}
+		return full;
+	}
+
+	async unload() {}
+	stop_sync() {}
+}

@@ -1,4 +1,5 @@
 import { warn } from './log.ts';
+import type { LocalStatus } from './llm-local.ts';
 import type { MlStatus } from './ml-client.ts';
 import type { SettingKey } from './settings.ts';
 import type { Status } from './store.ts';
@@ -35,6 +36,7 @@ export type BusEvent =
 	| QueueEvent
 	| FeedEvent
 	| { type: 'ml'; status: MlStatus }
+	| { type: 'llm'; status: LocalStatus }
 	| { type: 'settings'; key: SettingKey; value: unknown };
 
 export type Bus = ReturnType<typeof create_bus>;

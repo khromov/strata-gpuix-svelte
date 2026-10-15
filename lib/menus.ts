@@ -47,7 +47,7 @@ export function item_actions(item: Item, { on_item = false }: { on_item?: boolea
 	const app = get_app();
 	const url = item.source_url;
 	const llm = data.capabilities?.llm?.ok ?? false;
-	const vision = llm && !!app.settings.get('llm.visionModel');
+	const vision = data.capabilities?.vision?.ok ?? false;
 	const feed = item.feed_id == null ? null : (data.feeds.find((f) => f.id === item.feed_id) ?? null);
 	const playing = playback.id === item.id;
 

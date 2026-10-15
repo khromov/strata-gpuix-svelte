@@ -1,6 +1,5 @@
 import { clipboard_available } from './clipboard.ts';
 import { picker_available } from './dialogs.ts';
-import { llm_available, type LlmConfig } from './llm.ts';
 import { player_available } from './player.ts';
 import { init_recorder, recorder_available } from './recorder.ts';
 
@@ -17,9 +16,12 @@ export interface Capabilities {
 	filePicker: Cap;
 	player: Cap;
 	llm: Cap;
+	vision: Cap;
 }
 
-export async function capabilities({ llmConfig = null }: { llmConfig?: LlmConfig | null } = {}): Promise<Capabilities> {
+const NO_LLM: Cap = { ok: false, reason: 'no language model' };
+
+export async function capabilities({ llm = NO_LLM, vision = NO_LLM }: { llm?: Cap; vision?: Cap } = {}): Promise<Capabilities> {
 	await init_recorder();
 	const clipboard = clipboard_available();
 	return {
@@ -29,6 +31,7 @@ export async function capabilities({ llmConfig = null }: { llmConfig?: LlmConfig
 		clipboardText: clipboard.text,
 		filePicker: picker_available(),
 		player: player_available(),
-		llm: llm_available(llmConfig)
+		llm,
+		vision
 	};
 }

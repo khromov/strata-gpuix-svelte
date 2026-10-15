@@ -56,6 +56,7 @@ if (!existsSync(db_path) && existsSync(join(real, 'substrate.sqlite'))) {
 if (!existsSync(join(dir, 'models'))) symlinkSync(join(real, 'models'), join(dir, 'models'));
 
 const { create_app } = await import('../lib/app.ts');
+const { LocalStub } = await import('../lib/ml-stub.ts');
 const { derive_title, segments_to_markdown } = await import('../lib/media.ts');
 const { encode_mp3 } = await import('../lib/mp3.ts');
 const { decode_wav } = await import('../lib/wav.ts');
@@ -163,7 +164,8 @@ const can_speak = process.platform === 'darwin';
 const articles = await wikipedia(n_links + (can_speak ? n_audio : 0));
 const pictures = await photos(n_images);
 
-const app = await create_app({ data_dir: dir });
+// Describing 850 photos with Gemma would take the better part of an hour.
+const app = await create_app({ data_dir: dir, local: new LocalStub({ available: false, reason: 'seed-load skips image descriptions' }) });
 const { store, blobs, db } = app;
 const before = store.counts().total;
 const started = performance.now();

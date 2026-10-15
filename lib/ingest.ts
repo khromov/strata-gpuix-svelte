@@ -7,7 +7,7 @@
 import type { Blobs } from './blobs.ts';
 import type { Bus, ItemEvent } from './bus.ts';
 import { chunk_markdown, embed_text } from './chunk.ts';
-import { create_llm } from './llm.ts';
+import type { Llms } from './llms.ts';
 import { warn } from './log.ts';
 import { derive_title, segments_to_markdown, type Media } from './media.ts';
 import type { MlLike } from './ml-client.ts';
@@ -29,6 +29,7 @@ export interface IngestDeps {
 	ml: MlLike;
 	media: Media;
 	settings: Settings;
+	llms: Llms;
 	bus: Bus;
 	io_concurrency?: number;
 	fetch?: Fetcher;
@@ -46,7 +47,7 @@ export type Ingestor = ReturnType<typeof create_ingestor>;
 
 type Step = (item: Item) => Promise<void>;
 
-export function create_ingestor({ store, blobs, vectors, images, ml, media, settings, bus, io_concurrency = 4, fetch: fetch_fn = fetch }: IngestDeps) {
+export function create_ingestor({ store, blobs, vectors, images, ml, media, settings, llms, bus, io_concurrency = 4, fetch: fetch_fn = fetch }: IngestDeps) {
 	const queue: number[] = [];
 	const active = new Set<number>();
 	const timers = new Map<number, ReturnType<typeof setTimeout>>();
@@ -87,7 +88,7 @@ export function create_ingestor({ store, blobs, vectors, images, ml, media, sett
 		if (item.kind === 'audio' && !item.body && !item.meta.pcm_blob) steps.push(['convert', convert_step]);
 		if (item.kind === 'audio' && !item.body) steps.push(['transcribe', transcribe_step]);
 		if (item.kind === 'audio' && !item.meta.compacted) steps.push(['compact', compact_step]);
-		if (item.kind === 'image' && !item.body && settings.vision_config()) steps.push(['describe', describe_step]);
+		if (item.kind === 'image' && !item.body && llms.vision()) steps.push(['describe', describe_step]);
 		if (item.kind === 'image' && item.file_blob && !store.has_image_embedding(item.id)) steps.push(['clip', clip_step]);
 		steps.push(['embed', embed_step]);
 		return steps;
@@ -219,13 +220,13 @@ export function create_ingestor({ store, blobs, vectors, images, ml, media, sett
 
 	// Failure here is a note on the item, not a failed ingest: the LLM is optional.
 	async function describe_step(item: Item) {
-		const config = settings.vision_config();
-		if (!config) return;
+		const llm = llms.vision();
+		if (!llm) return;
 		const bytes = blobs.bytes(item.file_blob);
 		if (!bytes) return;
 		try {
-			const description = await create_llm(config).describe_image(bytes);
-			store.update_item(item.id, { body: description.trim(), meta: { described_by: config.model, describe_error: null } });
+			const description = await llm.describe_image(bytes, { background: true });
+			store.update_item(item.id, { body: description.trim(), meta: { described_by: llm.model, describe_error: null } });
 		} catch (err) {
 			warn(`describe failed for item ${item.id}:`, (err as Error).message);
 			store.update_item(item.id, { meta: { describe_error: (err as Error).message } });

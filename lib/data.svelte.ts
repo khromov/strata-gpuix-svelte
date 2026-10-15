@@ -5,6 +5,8 @@
 
 import type { App } from './app.ts';
 import type { capabilities } from './capabilities.ts';
+import type { LlmProvider } from './llm.ts';
+import type { LocalStatus } from './llm-local.ts';
 import type { MlStatus } from './ml-client.ts';
 import type { Feed, Item, Store } from './store.ts';
 
@@ -33,6 +35,9 @@ export interface Data {
 	stuck: number;
 	memory: number;
 	ml: MlStatus;
+	/** The on-device LLM's process and download. */
+	llm: LocalStatus;
+	provider: LlmProvider;
 	capabilities: Capabilities | null;
 	ready: boolean;
 }
@@ -47,6 +52,8 @@ export const data = $state<Data>({
 	stuck: 0,
 	memory: process.memoryUsage().rss,
 	ml: { embed: { state: 'unloaded' }, whisper: { state: 'unloaded' }, clip: { state: 'unloaded' }, worker: 'down', error: null } as MlStatus,
+	llm: { state: 'unloaded', progress: null, error: null, downloaded: false, rss: null },
+	provider: 'local',
 	capabilities: null,
 	ready: false
 });
@@ -87,6 +94,8 @@ export function bind_app(next: App) {
 	app = next;
 	data.items = app.list({ limit: 500 });
 	data.ml = app.ml.status;
+	data.llm = app.local.status;
+	data.provider = app.settings.provider();
 	refresh_counts();
 	refresh_feeds();
 	data.queue = app.ingest.stats;
@@ -128,7 +137,10 @@ export function bind_app(next: App) {
 			refresh_counts();
 		} else if (event.type === 'ml') {
 			data.ml = { ...event.status };
+		} else if (event.type === 'llm') {
+			data.llm = { ...event.status };
 		} else if (event.type === 'settings' && event.key.startsWith('llm.')) {
+			data.provider = app!.settings.provider();
 			app!.capabilities().then((caps) => {
 				data.capabilities = caps;
 			});

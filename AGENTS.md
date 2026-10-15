@@ -43,13 +43,19 @@ component belongs to a module instance the new one can't see.
 
 Env vars, all optional (`GPUIX_BRAIN_*`): `DIR` (data directory, default `.data`), `STUB=1` (seeded
 fake data and a stub worker — screenshots), `START=/settings`, `THEME=light|dark`, `ML=off`,
-`OFFLINE=1`, `RECORDER=0` (no microphone backend), `FEEDS=0`, `LLM_URL`/`LLM_KEY`/`LLM_MODEL`,
-`RESOURCES`, `DEBUG=1`. README.md has the table.
+`OFFLINE=1`, `RECORDER=0` (no microphone backend), `FEEDS=0`, `LLM_PROVIDER=local|openai`,
+`LLM_URL`/`LLM_KEY`/`LLM_MODEL`, `GEMMA_URL`, `RESOURCES`, `DEBUG=1`. README.md has the table.
 
 ## How it fits together
 
 - Models run in a child process (`ml/worker.ts`), which takes one job at a time and does not exist
   without the ML deps; the app opens and keyword search works without them.
+- The language model is Gemma 4 E4B on WebGPU by default, in a second child process
+  (`ml/llm-worker.ts`, client `LocalLlm` in `lib/llm-local.ts`) that starts on the first request,
+  downloads ~5.2 GB into the models directory the first time, and exits after ten idle minutes.
+  `lib/llms.ts` hands out Gemma or the OpenAI-compatible endpoint per request (`settings.provider()`);
+  the prompts themselves (`llm_tasks` in `lib/llm.ts`) are shared. Beside an `MlStub`, the app gets a
+  `LocalStub` that streams a canned answer, so tests and `STUB=1` never load Gemma.
 - `substrate.sqlite` is the master record: media are blob rows, and `<data-dir>/cache` is a
   disposable extraction of them (`lib/blobs.ts`).
 - RSS/Atom feeds are polled on a per-feed cron (croner, in-process), in or out of the
@@ -84,7 +90,9 @@ means bumping that number; `test/brain.ts` computes its own, since its recorder 
 macOS and Windows. `brain.ts` covers the WAV codec (including the streamed header the Windows
 recorder writes), the page extractor, SSE parser, chunker, vector index, store and pipeline with a
 stub worker, the feed parser and poller over fixture documents, the Windows mic consent parser,
-and the real IPC client against a fake worker (`test/fake-worker.ts`), including a crash.
+and the real IPC client against a fake worker (`test/fake-worker.ts`), including a crash; the same
+for `LocalLlm` against `test/fake-llm-worker.ts` (streaming, abort, crash, idle exit), plus the
+provider choice and Ask through the stub.
 `test/smoke.ts` mounts the app headlessly and captures, opens, deletes through GPUI's real hit
 testing; a long page paints only the rows in view. Prefer the click/press/hover helpers over
 calling `dispatch()` directly, which bypasses hit testing; `wait_for(pred)` waits on timers (a
@@ -110,9 +118,9 @@ settings ~6.1 ms, the longest item ~1.9 ms. On 2026-09-03 (native 0.7.0) they we
 
 ## Memory
 
-The development machine has 16 GB of RAM and each `ml/worker.ts` loads ~1 GB of ONNX models:
-check `ps -axo pid,rss,command | grep worker` after background runs and kill orphans, and prefer
-`GPUIX_BRAIN_STUB=1` or `MlStub` for screenshots and tests. Keep the safeguards: chunk length
+The development machine has 16 GB of RAM and each `ml/worker.ts` loads ~1 GB of ONNX models, each
+`ml/llm-worker.ts` 6–8 GB: check `ps -axo pid,rss,command | grep worker` after background runs and
+kill orphans, and prefer `GPUIX_BRAIN_STUB=1` or `MlStub` for screenshots and tests. Keep the safeguards: chunk length
 capped by characters, embedding batches of 8, `enableCpuMemArena: false`, idle unload of
 Whisper/CLIP, and the worker's orphan watchdog.
 

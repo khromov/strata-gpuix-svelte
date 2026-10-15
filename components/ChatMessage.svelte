@@ -1,15 +1,25 @@
 <script lang="ts">
 	import type { GpuixEvent } from 'gpuix-svelte';
 	import type { ChatMessage } from '../lib/chat.svelte.ts';
+	import { data } from '../lib/data.svelte.ts';
+	import { GEMMA_NAME } from '../lib/llm-local.ts';
 	import { message_actions } from '../lib/menus.ts';
 	import { open_menu } from '../lib/ui.svelte.ts';
 	import Markdown from './Markdown.svelte';
+	import ProgressBar from './ProgressBar.svelte';
 	import SourceChip from './SourceChip.svelte';
 	import Spinner from './Spinner.svelte';
 
 	let { message }: { message: ChatMessage } = $props();
 
 	const user = $derived(message.role === 'user');
+	// The first question on this computer waits for the model to download, then to load.
+	const gemma = $derived(data.provider === 'local' ? data.llm : null);
+	const waiting = $derived.by(() => {
+		if (gemma?.state === 'downloading') return `Downloading ${GEMMA_NAME}${gemma.progress != null ? ` · ${Math.round(gemma.progress)}%` : '…'}`;
+		if (gemma?.state === 'loading') return `Loading ${GEMMA_NAME}…`;
+		return 'Thinking…';
+	});
 	const show = (e: GpuixEvent) => open_menu(e, message_actions(message), user ? 'Your question' : 'Answer');
 </script>
 
@@ -23,7 +33,8 @@
 			{#if message.content}
 				<Markdown source={message.content} />
 			{:else if message.streaming}
-				<div class="thinking"><Spinner size={14} /><div>Thinking…</div></div>
+				<div class="thinking"><Spinner size={14} /><div>{waiting}</div></div>
+				{#if gemma?.state === 'downloading'}<ProgressBar value={gemma.progress} />{/if}
 			{/if}
 			{#if message.error}
 				<div class="error">{message.error}</div>

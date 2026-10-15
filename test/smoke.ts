@@ -191,6 +191,16 @@ await wait();
 check('long page keeps a markdown row per block', find_all((n) => n.type === 'markdown').length, 150);
 check('and paints the first block', painted().includes('Paragraph 0 of the long page.'));
 check('but not the last', painted().includes('Paragraph 149 of the long page.'), false);
+// A+ and A− step the entry's text size, and the choice is a setting, so it outlives a restart.
+const first_block = () => native.getElementBounds(find((n) => n.type === 'markdown')!.id)!.height;
+const before = { size: app.settings.get('reader.textSize'), height: first_block() };
+click_test_id('text-larger');
+await wait();
+check('A+ stores a larger text size', app.settings.get('reader.textSize') > before.size);
+check('and the entry text grows', first_block() > before.height);
+click_test_id('text-smaller');
+await wait();
+check('A− steps it back', app.settings.get('reader.textSize'), before.size);
 const body_list = find_test_id('item-body')!;
 let last_block = -1;
 body_list.children!.forEach((row, i) => {
@@ -301,9 +311,25 @@ await wait();
 check('the item view says when its page was fetched', painted().includes('Fetched'));
 check('and which feed it came from', painted().includes('Newsonaut'));
 
+// Ask goes to the on-device model by default; the stub streams an answer citing [1].
+push('/ask');
+await wait();
+await wait();
+dispatch({ elementId: find_test_id('ask-input')!.id, eventType: 'change', value: 'How often should I turn the compost heap?' });
+await wait();
+click_test_id('ask-send');
+check('an answer streams in from the on-device model', await eventually(() => painted().includes('Your notes cover this')));
+check('with the note it drew on beneath it', painted().includes('Compost notes'));
+
 push('/settings');
 await wait();
 await wait();
+check('settings shows the on-device model by default', find_test_id('settings-gemma') != null);
+await tap('OpenAI-compatible endpoint');
+check('choosing the endpoint shows its fields', painted().includes('Base URL'));
+check('and is stored', app.settings.provider(), 'openai');
+await tap('On this computer');
+check('switching back hides them', painted().includes('Base URL'), false);
 check('settings carries the same switch', find_test_id('settings-feeds') != null);
 // The tick is a filled box, so the palette's accent is what says the switch is on.
 check('and it carries what search just set', find_test_id('settings-feeds')?.children?.[0]?.style?.backgroundColor, DARK.accent);
@@ -311,4 +337,4 @@ check('and it carries what search just set', find_test_id('settings-feeds')?.chi
 console.log('screenshot:', screenshot(join(tmpdir(), 'substrate-smoke.png')));
 
 app.close();
-finish('smoke', 72);
+finish('smoke', 81);

@@ -16,6 +16,8 @@
 	import { untrack } from 'svelte';
 	import type { SearchHit } from '../lib/search.ts';
 	import { open_menu, toast } from '../lib/ui.svelte.ts';
+	import { block_gap, line_height, READER_SIZES } from '../lib/theme.ts';
+	import { reader, reader_theme, step_reader_size } from '../lib/theme.svelte.ts';
 	import Modal from '../components/Modal.svelte';
 
 	let { params, query }: { params: Record<string, string>; query: Record<string, string> } = $props();
@@ -46,7 +48,8 @@
 		return '';
 	});
 	const llm = $derived(data.capabilities?.llm?.ok ?? false);
-	const vision = $derived(llm && !!get_app().settings.get('llm.visionModel'));
+	const vision = $derived(data.capabilities?.vision?.ok ?? false);
+	const md = $derived(reader_theme());
 
 	let editing = $state(false);
 	let draft = $state({ title: '', body: '' });
@@ -159,6 +162,10 @@
 				{/if}
 			{/if}
 			<div class="grow"></div>
+			<div class="sizes">
+				<Button label="A−" small disabled={reader.size === READER_SIZES[0]} onclick={() => step_reader_size(-1)} testid="text-smaller" />
+				<Button label="A+" small disabled={reader.size === READER_SIZES.at(-1)} onclick={() => step_reader_size(1)} testid="text-larger" />
+			</div>
 			<Button label="Delete" icon="trash" variant="ghost" small onclick={() => (confirming = true)} testid="delete" />
 			{#if confirming}
 				<Modal title="Delete this item?" body={item.title || 'Untitled'} confirmLabel="Delete" danger onclose={confirmed} />
@@ -174,6 +181,7 @@
 					maxRows={60}
 					placeholder="Write in markdown…"
 					class="body-input"
+					style="font-size: {reader.size}px; line-height: {line_height(reader.size)}px"
 					onchange={(e) => { draft.body = e.value; schedule_save(); }}
 				></textarea>
 			</div>
@@ -213,13 +221,13 @@
 					<div class="row">
 						<div class="summary">
 							<div class="summary-label">Summary</div>
-							<Markdown source={item.meta.summary} />
+							<Markdown source={item.meta.summary} theme={md} />
 						</div>
 					</div>
 				{/if}
 
 				{#each blocks as block, i (i)}
-					<div class="block"><Markdown source={block} /></div>
+					<div class="block" style="padding-bottom: {block_gap(reader.size)}px"><Markdown source={block} theme={md} /></div>
 				{/each}
 				{#if !blocks.length && !busy && item.kind !== 'image'}
 					<div class="row placeholder">Nothing here yet.</div>
@@ -247,10 +255,11 @@
 	.missing { padding: 40px; text-align: center; color: var(--inkFaint); }
 	.bar { display: flex; flex-direction: row; align-items: center; gap: 8px; padding: 14px 24px; border-bottom-width: 1px; user-select: none; border-color: var(--divider); }
 	.grow { flex-grow: 1; }
+	.sizes { display: flex; flex-direction: row; gap: 4px; margin-right: 4px; }
 	.saved { padding-left: 8px; font-size: 13px; line-height: 18px; color: var(--inkFaint); }
 	.editor { display: flex; flex-direction: column; gap: 12px; flex-grow: 1; min-height: 0; padding: 20px 24px 24px 24px; }
 	.title-input { padding: 10px 12px; border-radius: 8px; border-width: 1px; font-size: 20px; line-height: 28px; font-weight: 600; background-color: var(--field); border-color: var(--borderStrong); color: var(--ink); }
-	.body-input { flex-grow: 1; min-height: 0; padding: 12px; border-radius: 8px; border-width: 1px; font-size: 15px; line-height: 24px; background-color: var(--field); border-color: var(--borderStrong); color: var(--ink); }
+	.body-input { flex-grow: 1; min-height: 0; padding: 12px; border-radius: 8px; border-width: 1px; background-color: var(--field); border-color: var(--borderStrong); color: var(--ink); }
 	.row { display: flex; flex-direction: column; width: 100%; padding-bottom: 16px; }
 	.header { gap: 10px; padding-top: 20px; }
 	.meta { display: flex; flex-direction: row; align-items: center; gap: 12px; font-size: 13px; line-height: 18px; user-select: none; color: var(--inkFaint); }
@@ -262,7 +271,7 @@
 	.og { width: 320px; height: 180px; border-radius: 10px; }
 	.summary { display: flex; flex-direction: column; gap: 8px; padding: 14px 16px; border-radius: 12px; background-color: var(--accentSoft); }
 	.summary-label { font-size: 12px; line-height: 16px; font-weight: 600; user-select: none; color: var(--accentDeep); }
-	.block { width: 100%; max-width: 760px; padding-bottom: 14px; }
+	.block { width: 100%; max-width: 760px; }
 	.placeholder { font-size: 14px; line-height: 21px; color: var(--inkFaint); }
 	.related { gap: 8px; padding-top: 8px; }
 	.related-label { padding-bottom: 4px; font-size: 12px; line-height: 16px; font-weight: 600; user-select: none; color: var(--inkFaint); }

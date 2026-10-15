@@ -4,10 +4,12 @@
 	import EmptyState from '../components/EmptyState.svelte';
 	import Scroller from 'gpuix-svelte/components/Scroller.svelte';
 	import { chat, clear, send, stop } from '../lib/chat.svelte.ts';
-	import { data } from '../lib/data.svelte.ts';
+	import { data, format_bytes } from '../lib/data.svelte.ts';
+	import { GEMMA_BYTES, GEMMA_NAME } from '../lib/llm-local.ts';
 	import { push } from '../lib/router.svelte.ts';
 
 	const configured = $derived(data.capabilities?.llm?.ok ?? false);
+	const local = $derived(data.provider === 'local');
 	let focused = $state(false);
 </script>
 
@@ -15,7 +17,9 @@
 	<Scroller pad="24px 24px 14px 24px" gap={16} follow={chat.streaming} testid="chat">
 		{#if chat.messages.length === 0}
 			{#if configured}
-				<EmptyState icon="sparkles" title="Ask your brain" />
+				<EmptyState icon="sparkles" title="Ask your brain" body={local && !data.llm.downloaded ? `The first question downloads ${GEMMA_NAME} (${format_bytes(GEMMA_BYTES)}), which then answers on this computer.` : ''} />
+			{:else if local}
+				<EmptyState icon="sparkles" title="{GEMMA_NAME} can't run here" body={data.capabilities?.llm?.reason ?? ''} action={{ label: 'Use an endpoint instead', icon: 'settings', onclick: () => push('/settings') }} />
 			{:else}
 				<EmptyState icon="sparkles" title="Connect a model to ask questions" action={{ label: 'Open settings', icon: 'settings', onclick: () => push('/settings') }} />
 			{/if}

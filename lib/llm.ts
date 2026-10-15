@@ -1,10 +1,13 @@
 /**
  * OpenAI-compatible chat completions over fetch: OpenAI, OpenRouter, Ollama and
  * LM Studio all speak this, differing only in how much of the base URL they expect.
+ * The prompts on top (describe, summarize, title) are shared with the on-device model.
  */
 
-import type { Cap } from './capabilities.ts';
 import { friendly_fetch_error } from './scrape.ts';
+
+/** Gemma on this machine, or the endpoint configured in Settings. */
+export type LlmProvider = 'local' | 'openai';
 
 export interface LlmConfig {
 	baseUrl: string;
@@ -28,9 +31,20 @@ export interface ChatOptions {
 	onDelta?: (delta: string, full: string) => void;
 	temperature?: number;
 	maxTokens?: number;
+	/** Work nobody is waiting on (describing an import); the on-device model serves it last. */
+	background?: boolean;
 }
 
-export type Llm = ReturnType<typeof create_llm>;
+export type ChatFn = (messages: Message[], opts?: ChatOptions) => Promise<string>;
+
+export interface Llm {
+	/** Recorded on what it wrote, as `described_by` and `summarized_by`. */
+	model: string;
+	chat: ChatFn;
+	describe_image(bytes: Uint8Array, opts?: { prompt?: string; signal?: AbortSignal; background?: boolean }): Promise<string>;
+	summarize(text: string, opts?: { maxWords?: number; signal?: AbortSignal }): Promise<string>;
+	suggest_title(text: string, opts?: { signal?: AbortSignal }): Promise<string>;
+}
 
 /** `http://localhost:11434` and a pasted `…/v1/chat/completions` both end up as `…/v1`. */
 export function normalize_base_url(input: string | null | undefined): string {
@@ -47,11 +61,6 @@ export function llm_config_from_env(): LlmConfig | null {
 	const model = process.env.GPUIX_BRAIN_LLM_MODEL;
 	if (!baseUrl || !model) return null;
 	return { baseUrl: normalize_base_url(baseUrl), apiKey: process.env.GPUIX_BRAIN_LLM_KEY ?? '', model };
-}
-
-export function llm_available(config: LlmConfig | null): Cap {
-	if (!config?.baseUrl || !config?.model) return { ok: false, reason: 'no LLM configured — set a base URL and model in Settings' };
-	return { ok: true };
 }
 
 export class LlmError extends Error {
@@ -217,35 +226,43 @@ export function create_llm(config: LlmConfig) {
 		return { ok: true, models: list, modelListed: list.includes(config.model) };
 	}
 
-	async function describe_image(bytes: Uint8Array, { prompt = DESCRIBE_PROMPT, signal }: { prompt?: string; signal?: AbortSignal } = {}): Promise<string> {
-		const webp = await new Bun.Image(bytes).resize(1024, 1024, { fit: 'inside', withoutEnlargement: true }).webp({ quality: 80 }).bytes();
-		const url = `data:image/webp;base64,${Buffer.from(webp).toString('base64')}`;
-		return chat(
-			[{ role: 'user', content: [{ type: 'text', text: prompt }, { type: 'image_url', image_url: { url, detail: 'low' } }] }],
-			{ stream: false, signal }
-		);
-	}
+	return { ...llm_tasks(config.model, chat), config: { ...config, baseUrl }, models, test };
+}
 
-	async function summarize(text: string, { maxWords = 120, signal }: { maxWords?: number; signal?: AbortSignal } = {}): Promise<string> {
-		return chat(
-			[
-				{ role: 'system', content: `Summarize the user's text in three to five bullet points, at most ${maxWords} words in total. Plain markdown, no preamble.` },
-				{ role: 'user', content: text.slice(0, 24_000) }
-			],
-			{ stream: false, signal }
-		);
-	}
+/** The prompts Substrate runs, over any chat function. */
+export function llm_tasks(model: string, chat: ChatFn): Llm {
+	return {
+		model,
+		chat,
 
-	async function suggest_title(text: string, { signal }: { signal?: AbortSignal } = {}): Promise<string> {
-		const raw = await chat(
-			[
-				{ role: 'system', content: 'Reply with only a title for the text: at most eight words, no quotes, no trailing period.' },
-				{ role: 'user', content: text.slice(0, 6000) }
-			],
-			{ stream: false, signal, maxTokens: 32 }
-		);
-		return raw.split('\n')[0].replace(/^["'“”]+|["'“”.]+$/g, '').trim().slice(0, 80);
-	}
+		async describe_image(bytes, { prompt = DESCRIBE_PROMPT, signal, background } = {}) {
+			const webp = await new Bun.Image(bytes).resize(1024, 1024, { fit: 'inside', withoutEnlargement: true }).webp({ quality: 80 }).bytes();
+			const url = `data:image/webp;base64,${Buffer.from(webp).toString('base64')}`;
+			return chat(
+				[{ role: 'user', content: [{ type: 'text', text: prompt }, { type: 'image_url', image_url: { url, detail: 'low' } }] }],
+				{ stream: false, signal, background }
+			);
+		},
 
-	return { config: { ...config, baseUrl }, chat, models, test, describe_image, summarize, suggest_title };
+		async summarize(text, { maxWords = 120, signal } = {}) {
+			return chat(
+				[
+					{ role: 'system', content: `Summarize the user's text in three to five bullet points, at most ${maxWords} words in total. Plain markdown, no preamble.` },
+					{ role: 'user', content: text.slice(0, 24_000) }
+				],
+				{ stream: false, signal }
+			);
+		},
+
+		async suggest_title(text, { signal } = {}) {
+			const raw = await chat(
+				[
+					{ role: 'system', content: 'Reply with only a title for the text: at most eight words, no quotes, no trailing period.' },
+					{ role: 'user', content: text.slice(0, 6000) }
+				],
+				{ stream: false, signal, maxTokens: 32 }
+			);
+			return raw.split('\n')[0].replace(/^["'“”]+|["'“”.]+$/g, '').trim().slice(0, 80);
+		}
+	};
 }

@@ -167,7 +167,7 @@ chmodSync(join(macos, 'substrate'), 0o755);
 writeFileSync(join(bundle, 'Contents', 'Info.plist'), PLIST);
 write_icns(join(root, 'icon.png'), join(resources, 'AppIcon.icns'));
 
-// The worker is bundled to one file (its shared lib/wav.ts inlined) and keeps its
+// Each worker is bundled to one file (the lib/ modules it shares inlined) and keeps its
 // real node_modules beside it: onnxruntime and sharp load from there as usual.
 const worker = await Bun.build({
 	entrypoints: [join(root, 'ml/worker.ts')],
@@ -181,6 +181,18 @@ if (!worker.success) {
 	process.exit(1);
 }
 writeFileSync(join(resources, 'ml', 'worker.js'), await worker.outputs[0].text());
+const llm_worker = await Bun.build({
+	entrypoints: [join(root, 'ml/llm-worker.ts')],
+	target: 'bun',
+	external: ['@huggingface/transformers'],
+	naming: 'llm-worker.js',
+	throw: false
+});
+if (!llm_worker.success) {
+	for (const message of llm_worker.logs) console.error(message);
+	process.exit(1);
+}
+writeFileSync(join(resources, 'ml', 'llm-worker.js'), await llm_worker.outputs[0].text());
 copyFileSync(join(root, 'ml/package.json'), join(resources, 'ml', 'package.json'));
 console.log('[build] copying the ML dependencies (a few hundred MB)');
 cpSync(join(root, 'ml/node_modules'), join(resources, 'ml', 'node_modules'), { recursive: true, dereference: true });

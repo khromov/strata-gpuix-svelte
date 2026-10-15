@@ -2,8 +2,8 @@
 
 A personal knowledge app rendered by Svelte into a native GPUI window. Pour anything in —
 text, links, images, voice recordings — and all of it becomes searchable by meaning, by keyword
-and by what is in the picture. An OpenAI-compatible model can then answer questions over it,
-citing the items it used.
+and by what is in the picture. A language model can then answer questions over it, citing the
+items it used: Gemma 4 E4B on your own GPU by default, or any OpenAI-compatible endpoint.
 
 It is built on [gpuix-svelte](https://github.com/khromov/gpuix-svelte), the Svelte custom
 renderer for GPUI, and started life as one of its examples; this repository began as
@@ -56,9 +56,19 @@ keyword search still works — the Models panel says what to run.
   them — it is on by default, the same switch appears on the timeline, beside the search page's kind
   filters and in Settings, and it is remembered. A single query overrides it with `feeds:on`. An entry whose URL you had already saved is adopted rather
   than duplicated, and an entry you delete is never fetched again.
-- **Ask**: retrieval-augmented chat over the corpus with any OpenAI-compatible endpoint (Ollama,
-  LM Studio, OpenAI, OpenRouter). Answers stream in as markdown; `[n]` citations become chips that
-  open the item. A vision model, when configured, describes images on import.
+- **Ask**: retrieval-augmented chat over the corpus. Answers stream in as markdown; `[n]` citations
+  (and lists like `[1, 3]`) light up the chips that open the item. Settings → Language model picks
+  who answers:
+  - **On this computer** (the default): Gemma 4 E4B (`onnx-community/gemma-4-E4B-it-ONNX`, q4f16)
+    through transformers.js on WebGPU, which is Metal on macOS, in a child process of its own
+    (`ml/llm-worker.ts`). The first question, summary or imported image downloads it (~5.2 GB, with
+    progress in the chat and the status pill); loaded it takes about 6 GB, and the process exits after
+    ten idle minutes. It reads images too, so every imported image is described.
+  - **OpenAI-compatible endpoint**: Ollama, LM Studio, OpenAI, OpenRouter. A vision model, when
+    configured, describes images on import.
+
+  An endpoint configured before the choice existed (or through `GPUIX_BRAIN_LLM_URL`) keeps being
+  used until you pick.
 - **Right-click anything**: an item, a feed, a sidebar entry, an answer, a citation, or empty space.
   Each offers what applies to it — a failed link gets *Retry* and *Re-read page*, an audio item gets
   *Play*, empty space gets the capture actions — with the arrow keys and Enter working through it and
@@ -89,6 +99,8 @@ keyword search still works — the Models panel says what to run.
   lib/feeds/             the poller (poll.ts, croner) over a source registry; rss.ts reads RSS 2.0,
                          RDF and Atom, and another kind is a module plus an entry in SOURCES
   ml/worker.ts           the child process that owns the models; ml/doctor.ts is the spike
+  ml/llm-worker.ts       Gemma's own child process, started on demand (client: lib/llm-local.ts;
+                         lib/llms.ts picks Gemma or the endpoint per request)
   native/recorder-shim.m AVAudioRecorder over bun:ffi, compiled by clang on first use (macOS);
                          lib/recorder-win.ts and lib/player-win.ts are the winmm equivalents,
                          over the shared FFI surface in lib/winmm.ts
@@ -125,6 +137,10 @@ embedding batches are eight chunks, the arena is off, Whisper and CLIP unload af
 minutes, a worker whose parent died exits on its own, and Settings shows the worker's and the
 app's resident size. Run one model-loading process at a time.
 
+Gemma is the big one: about 6 GB resident while loaded (8 GB after a long prompt), in a process
+that only exists between the first request and ten idle minutes later. Exiting is the unload,
+since it is the one way to be sure WebGPU's buffers go back.
+
 ## The macOS app
 
 `bun run build` runs `build.ts`: `Bun.build({ compile })` over
@@ -154,7 +170,9 @@ All optional, all `GPUIX_BRAIN_*`:
 | `OFFLINE=1` | never download models |
 | `RECORDER=0` | don't load the microphone backend (nor compile the shim, on macOS) |
 | `FEEDS=0` | no scheduled feed polling (manual refresh still works); implied by `OFFLINE=1` |
+| `LLM_PROVIDER=local\|openai` | override the Language model choice in Settings |
 | `LLM_URL`, `LLM_KEY`, `LLM_MODEL` | override Settings; the key never has to be stored |
+| `GEMMA_URL` | where Gemma's files download from (`<url>/config.json`, `<url>/onnx/…`; the list is `GEMMA_FILES` in `lib/llm-local.ts`) |
 | `RESOURCES=/path` | where a compiled app's worker and shim live (auto-detected inside a .app) |
 | `DEBUG=1` | verbose logging |
 

@@ -17,6 +17,10 @@
 			const pct = Math.round(ml[downloading[0]].progress ?? 0);
 			return { tone: 'warn', text: `downloading ${downloading[0]} ${pct}%`, busy: true };
 		}
+		// An imported image can start Gemma's download with nobody on the Ask page to see it.
+		const gemma = data.provider === 'local' ? data.llm : null;
+		if (gemma?.state === 'downloading') return { tone: 'warn', text: `downloading Gemma ${Math.round(gemma.progress ?? 0)}%`, busy: true };
+		if (gemma?.state === 'loading') return { tone: 'warn', text: 'loading Gemma', busy: true };
 		if (states.includes('loading') || ml.worker === 'starting') return { tone: 'warn', text: 'loading models', busy: true };
 		if (states.some((s) => s === 'error')) return { tone: 'error', text: 'model error', busy: false };
 		const ready = states.filter((s) => s === 'ready').length;

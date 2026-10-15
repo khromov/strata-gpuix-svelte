@@ -15,11 +15,12 @@ import { open_db } from './db.ts';
 import { create_feeds } from './feeds/poll.ts';
 import { create_ingestor } from './ingest.ts';
 import { install_exit_handlers } from './lifecycle.ts';
-import { create_llm } from './llm.ts';
+import { LocalLlm, type LocalLike, type LocalStatus } from './llm-local.ts';
+import { create_llms } from './llms.ts';
 import { log, warn } from './log.ts';
 import { create_media, derive_title, needs_display_copy } from './media.ts';
 import { DIMS, MlClient, type MlLike, type MlStatus } from './ml-client.ts';
-import { MlStub } from './ml-stub.ts';
+import { LocalStub, MlStub } from './ml-stub.ts';
 import { data_dirs, resources_dir } from './paths.ts';
 import { normalize_url } from './scrape.ts';
 import { create_search, type SearchOptions } from './search.ts';
@@ -39,6 +40,8 @@ export type ImageSource =
 export interface AppOptions {
 	data_dir?: string | null;
 	ml?: MlLike | null;
+	/** The on-device LLM; by default the real one beside a real worker, a stub beside a stub. */
+	local?: LocalLike | null;
 	fetch?: Fetcher;
 	autoload?: boolean;
 	seed?: boolean;
@@ -49,6 +52,7 @@ export interface AppOptions {
 const ML_DIR = resources_dir() ? join(resources_dir()!, 'ml') : fileURLToPath(new URL('../ml', import.meta.url));
 // The compiled app bundles the worker to `worker.js`; a checkout runs the source.
 const WORKER = join(ML_DIR, resources_dir() ? 'worker.js' : 'worker.ts');
+const LLM_WORKER = join(ML_DIR, resources_dir() ? 'llm-worker.js' : 'llm-worker.ts');
 const ML_INSTALLED = join(ML_DIR, 'node_modules', '@huggingface', 'transformers', 'package.json');
 
 export const ml_installed = () => existsSync(ML_INSTALLED);
@@ -67,10 +71,16 @@ export function default_ml({ models_dir, autoload = true, on_status }: { models_
 	});
 }
 
+/** Gemma lives in the same ml/ package as the other models, so it is off (or stubbed) with them. */
+export function default_local({ ml, models_dir, on_status }: { ml: MlLike; models_dir: string; on_status?: (s: LocalStatus) => void }): LocalLike {
+	if (ml instanceof MlStub) return new LocalStub({ available: ml.available, reason: ml.reason, on_status });
+	return new LocalLlm({ worker_path: LLM_WORKER, models_dir, on_status });
+}
+
 const date_label = () =>
 	new Date().toLocaleString(undefined, { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
 
-export async function create_app({ data_dir = null, ml = null, fetch: fetch_fn = fetch, autoload = true, seed = false }: AppOptions = {}) {
+export async function create_app({ data_dir = null, ml = null, local = null, fetch: fetch_fn = fetch, autoload = true, seed = false }: AppOptions = {}) {
 	install_exit_handlers();
 	const dirs = data_dirs(data_dir ?? undefined);
 	const db = open_db(dirs.db);
@@ -88,8 +98,12 @@ export async function create_app({ data_dir = null, ml = null, fetch: fetch_fn =
 	const on_status = (status: MlStatus) => bus.emit({ type: 'ml', status });
 	ml ??= default_ml({ models_dir: dirs.models, autoload: autoload && settings.get('ml.autoload') !== false, on_status });
 	ml.on_status = on_status;
+	const on_llm_status = (status: LocalStatus) => bus.emit({ type: 'llm', status });
+	local ??= default_local({ ml, models_dir: dirs.models });
+	local.on_status = on_llm_status;
+	const llms = create_llms({ settings, local });
 
-	const ingest = create_ingestor({ store, blobs, vectors, images, ml, media, settings, bus, fetch: fetch_fn });
+	const ingest = create_ingestor({ store, blobs, vectors, images, ml, media, settings, llms, bus, fetch: fetch_fn });
 	const search = create_search({ store, vectors, images, ml, settings });
 
 	// Retention and "remove a feed with its items" reuse the whole teardown, blobs included.
@@ -115,9 +129,9 @@ export async function create_app({ data_dir = null, ml = null, fetch: fetch_fn =
 		embed_ready = ready;
 	});
 
-	// Configuring a vision model later still describes the images already here.
+	// Configuring a vision model later (or switching to Gemma) still describes the images already here.
 	bus.subscribe((e) => {
-		if (e.type !== 'settings' || !e.key.startsWith('llm.') || !settings.vision_config()) return;
+		if (e.type !== 'settings' || !e.key.startsWith('llm.') || !llms.vision()) return;
 		for (const item of store.list_items({ kind: 'image', limit: 10_000 })) {
 			if (!item.body && item.file_blob && item.status !== 'processing') {
 				store.set_status(item.id, 'pending');
@@ -145,6 +159,8 @@ export async function create_app({ data_dir = null, ml = null, fetch: fetch_fn =
 		vectors,
 		images,
 		ml,
+		local,
+		llms,
 		ingest,
 		media,
 		bus,
@@ -237,24 +253,24 @@ export async function create_app({ data_dir = null, ml = null, fetch: fetch_fn =
 
 		/** Replaces an image's body with a vision model's description. */
 		async describe_image(id: number): Promise<string> {
-			const config = settings.vision_config();
-			if (!config) throw new Error('set a vision model in Settings first');
+			const llm = llms.vision();
+			if (!llm) throw new Error(llms.caps().vision.reason ?? 'no vision model');
 			const item = store.get_item(id);
 			const bytes = blobs.bytes(item?.file_blob);
 			if (!bytes) throw new Error('no image file');
-			const description = (await create_llm(config).describe_image(bytes)).trim();
-			store.update_item(id, { meta: { described_by: config.model, describe_error: null } });
+			const description = (await llm.describe_image(bytes)).trim();
+			store.update_item(id, { meta: { described_by: llm.model, describe_error: null } });
 			app.update_note(id, { body: description });
 			return description;
 		},
 
 		async summarize(id: number): Promise<string> {
-			const config = settings.llm_config();
-			if (!config) throw new Error('set up an LLM in Settings first');
+			const llm = llms.text();
+			if (!llm) throw new Error(llms.caps().llm.reason ?? 'no language model');
 			const item = store.get_item(id);
 			if (!item?.body) throw new Error('nothing to summarize yet');
-			const summary = (await create_llm(config).summarize(item.body)).trim();
-			store.update_item(id, { meta: { summary, summarized_by: config.model } });
+			const summary = (await llm.summarize(item.body)).trim();
+			store.update_item(id, { meta: { summary, summarized_by: llm.model } });
 			bus.emit({ type: 'item', id, status: item.status, updated: true });
 			return summary;
 		},
@@ -263,7 +279,7 @@ export async function create_app({ data_dir = null, ml = null, fetch: fetch_fn =
 		list: (opts?: ListOptions) => store.list_items(opts),
 		search: (query: string, opts?: SearchOptions) => search.search(query, opts),
 		related: (id: number, opts?: { limit?: number }) => search.related(id, opts),
-		ask: (question: string, opts?: AskOptions) => ask_llm({ search, settings }, question, opts),
+		ask: (question: string, opts?: AskOptions) => ask_llm({ search, llms }, question, opts),
 		retry: (id: number) => ingest.retry(id),
 
 		/** Fetches a link again: body, title (when never edited) and preview image are replaced. */
@@ -279,13 +295,14 @@ export async function create_app({ data_dir = null, ml = null, fetch: fetch_fn =
 		requeue: () => ingest.requeue_stuck(),
 		stuck_count: () => ingest.stuck_count(),
 		reindex: () => ingest.reindex_all(),
-		capabilities: () => get_capabilities({ llmConfig: settings.llm_config() }),
+		capabilities: () => get_capabilities(llms.caps()),
 		subscribe: bus.subscribe,
 		snapshot: () => ({ ml: ml.status, queue: ingest.stats, counts: store.counts() }),
 		close() {
 			clearInterval(heal);
 			feeds.stop();
 			ml.stop_sync();
+			local.stop_sync();
 			db.close();
 		}
 	};
