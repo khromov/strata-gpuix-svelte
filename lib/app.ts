@@ -345,7 +345,7 @@ async function seed_demo(app: App) {
 		title: 'Reading list',
 		body: 'Books to get to this autumn:\n\n1. *The One-Straw Revolution*\n2. *Braiding Sweetgrass*\n3. Something on soil biology'
 	});
-	app.add_note({ body: 'Idea: a tiny app that turns everything I pour into it into fertile ground. Call it Substrate.' });
+	app.add_note({ body: 'Idea: a tiny app where everything I pour into it settles into layers I can dig back through. Call it Strata.' });
 	app.store.insert_item({
 		kind: 'link',
 		title: 'Loam - Wikipedia',
@@ -363,7 +363,7 @@ async function seed_demo(app: App) {
 		meta: { auto_title: true }
 	});
 	const icon = fileURLToPath(new URL('../icon.png', import.meta.url));
-	if (existsSync(icon)) await app.add_image(icon, { title: 'Substrate icon' });
+	if (existsSync(icon)) await app.add_image(icon, { title: 'Strata icon' });
 	const sine = Float32Array.from({ length: 16000 }, (_, i) => 0.3 * Math.sin((2 * Math.PI * 440 * i) / 16000));
 	const wav = `${app.dirs.tmp}/demo-memo.wav`;
 	await Bun.write(wav, encode_wav(sine, 16000));

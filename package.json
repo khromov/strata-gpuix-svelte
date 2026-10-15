@@ -1,8 +1,8 @@
 {
-	"name": "substrate-gpuix-svelte",
+	"name": "strata-gpuix-svelte",
 	"private": true,
 	"version": "0.0.0",
-	"description": "Substrate, a second brain in a native GPUI window: notes, links, images and voice memos, hybrid search and RAG chat, built with gpuix-svelte",
+	"description": "Strata, a second brain in a native GPUI window: notes, links, images and voice memos, hybrid search and RAG chat, built with gpuix-svelte",
 	"type": "module",
 	"scripts": {
 		"start": "gpuix-svelte --bun app.ts",

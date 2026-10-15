@@ -56,7 +56,7 @@ export async function pick_images() {
 	const app = get_app();
 	let paths: string[];
 	try {
-		paths = await choose_files({ kinds: 'image', multiple: true, prompt: 'Add images to Substrate' });
+		paths = await choose_files({ kinds: 'image', multiple: true, prompt: 'Add images to Strata' });
 	} catch (err) {
 		toast((err as Error).message, 'error');
 		return;

@@ -22,7 +22,7 @@ export const GEMMA_NAME = 'Gemma 4 E4B';
  */
 export const GEMMA_URL = 'https://sta-public.fra1.cdn.digitaloceanspaces.com/onnx-community/gemma-4-E4B-it-ONNX';
 /**
- * Everything the worker reads: q4f16 weights for WebGPU. Substrate never sends audio, but
+ * Everything the worker reads: q4f16 weights for WebGPU. Strata never sends audio, but
  * transformers.js loads every session the model declares, so the audio encoder comes too.
  */
 export const GEMMA_FILES = [

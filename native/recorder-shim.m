@@ -12,7 +12,7 @@ static void set_error(NSString *message) {
 }
 
 // 0 not determined, 1 authorized, 2 denied, 3 restricted
-int substrate_rec_auth_status(void) {
+int strata_rec_auth_status(void) {
     switch ([AVCaptureDevice authorizationStatusForMediaType:AVMediaTypeAudio]) {
         case AVAuthorizationStatusAuthorized: return 1;
         case AVAuthorizationStatusDenied:     return 2;
@@ -23,14 +23,14 @@ int substrate_rec_auth_status(void) {
 
 // Returns the status right away; 0 means the system prompt is up and the caller
 // polls, because blocking here would stall the run loop the prompt is drawn on.
-int substrate_rec_request_permission(void) {
-    int status = substrate_rec_auth_status();
+int strata_rec_request_permission(void) {
+    int status = strata_rec_auth_status();
     if (status != 0) return status;
     [AVCaptureDevice requestAccessForMediaType:AVMediaTypeAudio completionHandler:^(BOOL granted) {}];
     return 0;
 }
 
-int substrate_rec_start(const char *path) {
+int strata_rec_start(const char *path) {
     if (recorder && recorder.recording) {
         set_error(@"already recording");
         return -1;
@@ -65,7 +65,7 @@ int substrate_rec_start(const char *path) {
     return 0;
 }
 
-double substrate_rec_stop(void) {
+double strata_rec_stop(void) {
     if (!recorder) return 0;
     double seconds = recorder.currentTime;
     [recorder stop];
@@ -73,21 +73,21 @@ double substrate_rec_stop(void) {
     return seconds;
 }
 
-int substrate_rec_is_recording(void) {
+int strata_rec_is_recording(void) {
     return recorder != nil && recorder.recording;
 }
 
-double substrate_rec_current_time(void) {
+double strata_rec_current_time(void) {
     return recorder ? recorder.currentTime : 0;
 }
 
 // dBFS in [-160, 0]
-double substrate_rec_level(void) {
+double strata_rec_level(void) {
     if (!recorder || !recorder.recording) return -160;
     [recorder updateMeters];
     return [recorder averagePowerForChannel:0];
 }
 
-const char *substrate_rec_last_error(void) {
+const char *strata_rec_last_error(void) {
     return last_error;
 }

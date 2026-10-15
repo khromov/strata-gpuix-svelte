@@ -36,7 +36,7 @@ export async function export_item(item: Item) {
 	const app = get_app();
 	const blob = app.blobs.info(item.file_blob!);
 	if (!blob) throw new Error('no file on this item');
-	const suggested = item.meta.original_name?.replace(/\.[^.]+$/, '') || item.title || `substrate-${item.id}`;
+	const suggested = item.meta.original_name?.replace(/\.[^.]+$/, '') || item.title || `strata-${item.id}`;
 	const dest = await choose_save_path(`${suggested}.${blob.ext}`);
 	if (!dest) return;
 	await Bun.write(dest, app.blobs.bytes(blob.id)!);

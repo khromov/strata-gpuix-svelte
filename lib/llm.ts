@@ -150,7 +150,7 @@ export function create_llm(config: LlmConfig) {
 	const timeoutMs = config.timeoutMs ?? 120_000;
 
 	const headers = (): Record<string, string> => {
-		const h: Record<string, string> = { 'Content-Type': 'application/json', 'X-Title': 'Substrate' };
+		const h: Record<string, string> = { 'Content-Type': 'application/json', 'X-Title': 'Strata' };
 		if (config.apiKey) h.Authorization = `Bearer ${config.apiKey}`;
 		return h;
 	};
@@ -229,7 +229,7 @@ export function create_llm(config: LlmConfig) {
 	return { ...llm_tasks(config.model, chat), config: { ...config, baseUrl }, models, test };
 }
 
-/** The prompts Substrate runs, over any chat function. */
+/** The prompts Strata runs, over any chat function. */
 export function llm_tasks(model: string, chat: ChatFn): Llm {
 	return {
 		model,

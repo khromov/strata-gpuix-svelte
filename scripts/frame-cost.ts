@@ -1,5 +1,5 @@
 /**
- * Draw-time stats for Substrate's routes, from GPUI's own debug frame overlay: boots the
+ * Draw-time stats for Strata's routes, from GPUI's own debug frame overlay: boots the
  * app against a copy of the data (the real brain is never written), visits each route,
  * and prints how long a frame takes at idle and while wheel events scroll the content
  * column. Scroll lag here is native per-frame layout, so this is the number to read
@@ -29,16 +29,16 @@ const { Database } = await import('bun:sqlite');
 const { render, get_native, window_size, debug_overlay_stats, reset_debug_overlay_stats } = await import('gpuix-svelte');
 const { create_app } = await import('../lib/app.ts');
 const { MlStub } = await import('../lib/ml-stub.ts');
-const { default_root } = await import('../lib/paths.ts');
+const { database_path, default_root } = await import('../lib/paths.ts');
 const { push } = await import('../lib/router.svelte.ts');
 const { WINDOW } = await import('../lib/window.ts');
 const App = (await import('../App.svelte')).default;
 
 const source = process.env.GPUIX_BRAIN_DIR || default_root();
-const data_dir = mkdtempSync(join(tmpdir(), 'substrate-frames-'));
-const copy = join(data_dir, 'substrate.sqlite');
+const data_dir = mkdtempSync(join(tmpdir(), 'strata-frames-'));
+const copy = database_path(data_dir);
 // VACUUM INTO reads through the WAL, so the copy is consistent even while the app is open.
-new Database(join(source, 'substrate.sqlite'), { readonly: true }).run('VACUUM INTO ?', [copy]);
+new Database(database_path(source), { readonly: true }).run('VACUUM INTO ?', [copy]);
 const longest = new Database(copy, { readonly: true }).query<{ id: number }, []>('SELECT id FROM items ORDER BY length(body) DESC LIMIT 1').get();
 const routes = wanted.length ? wanted : ['/', '/settings', ...(longest ? [`/item/${longest.id}`] : [])];
 console.log(`[frames] ${source} copied to ${data_dir}`);

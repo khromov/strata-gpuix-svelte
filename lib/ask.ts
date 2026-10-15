@@ -4,7 +4,7 @@ import { clip_snippet } from './rank.ts';
 import type { Search } from './search.ts';
 import type { Kind } from './store.ts';
 
-const SYSTEM = `You are Substrate, a personal second brain. Answer the question using only the numbered sources from the user's own notes, links, images and recordings. Cite a source as [n] right after the fact it supports. If the sources do not contain the answer, say so plainly rather than guessing. Be concise; use markdown.`;
+const SYSTEM = `You are Strata, a personal second brain. Answer the question using only the numbered sources from the user's own notes, links, images and recordings. Cite a source as [n] right after the fact it supports. If the sources do not contain the answer, say so plainly rather than guessing. Be concise; use markdown.`;
 
 export interface Source {
 	n: number;

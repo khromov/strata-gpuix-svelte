@@ -1,5 +1,5 @@
 /**
- * MP3 is the one compressed format Substrate handles, in both directions and entirely
+ * MP3 is the one compressed format Strata handles, in both directions and entirely
  * in-process: LAME and mpg123 as WebAssembly, so there is no ffmpeg to install and both
  * inline into the standalone binary.
  */

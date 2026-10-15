@@ -43,7 +43,7 @@
 	// The palette is the only theme: every `var(--…)` in the style block below resolves against it.
 	$effect(() => set_css_vars(tokens()));
 	$effect(() => {
-		set_window_title(ui.title === 'Everything' ? 'Substrate' : `Substrate — ${ui.title}`);
+		set_window_title(ui.title === 'Everything' ? 'Strata' : `Strata — ${ui.title}`);
 	});
 
 	function onkey(e: GpuixEvent) {

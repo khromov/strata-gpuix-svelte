@@ -1,5 +1,5 @@
 /**
- * Pours the Hacker News front page into Substrate: every story with an external
+ * Pours the Hacker News front page into Strata: every story with an external
  * URL becomes a link item, scraped and embedded through the normal pipeline. Doubles
  * as a scrape smoke test across whatever sites are on the front page today.
  *

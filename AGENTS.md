@@ -1,6 +1,6 @@
 # AGENTS.md
 
-Substrate is a "second brain" desktop app: notes, links, images and voice memos, hybrid search
+Strata is a "second brain" desktop app: notes, links, images and voice memos, hybrid search
 and RAG chat. It is a gpuix-svelte app: Svelte 5 components rendered into a native desktop window
 by GPUI, the GPU-accelerated UI framework behind the Zed editor. It moved here from gpuix-svelte's
 `examples/second-brain` (that repository's history has everything before the move), on top of a
@@ -22,7 +22,7 @@ bun run test         # test/brain.ts, then test/smoke.ts; no models, no network
 bun run typecheck    # tsc, then svelte-check against GPUI's element types
 bun run ml:doctor    # loads all three models under Bun and runs one inference each; the first
                      # run downloads ~380 MB into .data/models
-bun run build        # dist/substrate + dist/Substrate.app (macOS only)
+bun run build        # dist/strata + dist/Strata.app (macOS only)
 bun run import-hn    # pours the Hacker News front page into the real brain (scrape smoke test)
 bun run seed-load    # [count] [--fresh]: a copy of the brain plus 5000 generated items in
                      # .data/load; open it with GPUIX_BRAIN_DIR=.data/load. Downloads stay
@@ -56,7 +56,7 @@ fake data and a stub worker — screenshots), `START=/settings`, `THEME=light|da
   `lib/llms.ts` hands out Gemma or the OpenAI-compatible endpoint per request (`settings.provider()`);
   the prompts themselves (`llm_tasks` in `lib/llm.ts`) are shared. Beside an `MlStub`, the app gets a
   `LocalStub` that streams a canned answer, so tests and `STUB=1` never load Gemma.
-- `substrate.sqlite` is the master record: media are blob rows, and `<data-dir>/cache` is a
+- `strata.sqlite` is the master record: media are blob rows, and `<data-dir>/cache` is a
   disposable extraction of them (`lib/blobs.ts`).
 - RSS/Atom feeds are polled on a per-feed cron (croner, in-process), in or out of the
   timeline/search/Ask/Related behind one `feeds.include` switch.
@@ -104,7 +104,7 @@ of range", hiservices XPC errors); run tests and the app with the sandbox off.
 ## Measuring frame cost
 
 Scroll lag here is native per-frame layout, not JS, so measure before reasoning. `bun run frames
-[--keep] [route ...]` (`scripts/frame-cost.ts`) boots Substrate against a `VACUUM INTO` copy of
+[--keep] [route ...]` (`scripts/frame-cost.ts`) boots Strata against a `VACUUM INTO` copy of
 the data, visits each route (default: `/`, `/settings` and the item with the longest body), and
 prints a table of GPUI's own draw times: idle frames over 2 s, then p90/p99/max and fps while 90
 wheel events scroll the content column. `--keep` leaves the window open with the overlay on, for
@@ -127,12 +127,13 @@ Whisper/CLIP, and the worker's orphan watchdog.
 ## Building
 
 `bun run build` runs `build.ts`: `Bun.build({ compile })` over `standalone.ts` gives
-`dist/substrate`, and `dist/Substrate.app` is assembled around it. macOS only, and it needs
+`dist/strata`, and `dist/Strata.app` is assembled around it. macOS only, and it needs
 `ml:install` first. transformers.js can't be compiled into a Bun binary
 (huggingface/transformers.js#1672), so the worker ships as source with its `node_modules` in
 `Contents/Resources` and the app runs it on its own embedded Bun (`BUN_BE_BUN=1`). onnxruntime-node
 ships every platform's prebuilt runtime, so the copy is pruned to the host's. The compiled app keeps
-its data in `~/Library/Application Support/Substrate`. `CODESIGN_IDENTITY` signs with the hardened
+its data in `~/Library/Application Support/Strata` (`lib/paths.ts` moves a `Substrate` folder and
+a `substrate.sqlite` there from before the rename). `CODESIGN_IDENTITY` signs with the hardened
 runtime and `NOTARY_PROFILE` then notarizes and staples (`xcrun notarytool store-credentials
 <profile>` once). `standalone.ts` mounts `App.svelte` with `render` and a static import, since a
 binary has no source to hot-reload; keep its window options in step with `app.ts` (both read

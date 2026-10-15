@@ -4,7 +4,7 @@
  * IDLE_EXIT_MS without one the process exits, which hands back all ~6 GB at once.
  */
 
-import { GEMMA_ID, GEMMA_NAME, GEMMA_URL, gemma_downloaded, gemma_messages, type LlmJob, type LlmMessage, type LlmRequest, type LlmResults } from '../lib/llm-local.ts';
+import { GEMMA_BYTES, GEMMA_ID, GEMMA_NAME, GEMMA_URL, gemma_downloaded, gemma_messages, type LlmJob, type LlmMessage, type LlmRequest, type LlmResults } from '../lib/llm-local.ts';
 import type { ModelState } from '../lib/ml-client.ts';
 import type { Failure } from '../lib/types.ts';
 
@@ -29,7 +29,8 @@ const IDLE_EXIT_MS = 10 * 60_000;
 
 interface TfProgress {
 	status: string;
-	progress?: number;
+	file?: string;
+	loaded?: number;
 }
 // Typed loosely: transformers.js is an ambient `any` until `ml:install` (ml/ambient.d.ts).
 interface Gemma {
@@ -47,12 +48,18 @@ async function load_gemma(): Promise<Gemma> {
 		throw Object.assign(new Error(`${GEMMA_NAME} is not downloaded, and GPUIX_BRAIN_OFFLINE=1 forbids it`), { code: 'MODEL_LOAD' });
 	}
 	status(fetching ? 'downloading' : 'loading', { progress: fetching ? 0 : null });
-	// `progress_total` also counts reads from the cache, so it only says "downloading" when
-	// files were missing; past 100% what is left is building the GPU sessions.
+	// Counted here against GEMMA_BYTES: transformers.js's own `progress_total` trusts each
+	// response's Content-Length, which a CDN that gzips on the fly leaves out. Reads from
+	// the cache report progress too, so this only runs when files were missing; past 100%
+	// what is left is building the GPU sessions.
+	const received = new Map<string, number>();
 	let shown = -1;
 	const progress_callback = (p: TfProgress) => {
-		if (!fetching || p.status !== 'progress_total') return;
-		const pct = Math.min(100, Math.floor(p.progress ?? 0));
+		if (!fetching || p.status !== 'progress' || !p.file) return;
+		received.set(p.file, p.loaded ?? 0);
+		let bytes = 0;
+		for (const n of received.values()) bytes += n;
+		const pct = Math.min(100, Math.floor((bytes / GEMMA_BYTES) * 100));
 		if (pct === shown) return;
 		shown = pct;
 		if (pct >= 100) status('loading');

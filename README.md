@@ -1,4 +1,4 @@
-# Substrate — a second brain on GPUI
+# Strata — a second brain on GPUI
 
 A personal knowledge app rendered by Svelte into a native GPUI window. Pour anything in —
 text, links, images, voice recordings — and all of it becomes searchable by meaning, by keyword
@@ -16,10 +16,10 @@ renderer for GPUI, and started life as one of its examples; this repository bega
 bun install             # the app's dependencies, gpuix-svelte and its Svelte build included
 bun run ml:install      # once: the ML dependencies (transformers.js + onnxruntime + sharp) into ml/
 bun run ml:doctor       # optional: proves the models run under Bun, downloads them (~380 MB)
-bun run start           # opens Substrate; saving a .svelte file hot-reloads it
+bun run start           # opens Strata; saving a .svelte file hot-reloads it
 bun run test            # test/brain.ts (data + native, no models) and test/smoke.ts (headless UI)
 bun run typecheck       # tsc, then svelte-check against GPUI's element types
-bun run build           # dist/Substrate.app, models and all (macOS)
+bun run build           # dist/Strata.app, models and all (macOS)
 bun run import-hn       # pours today's Hacker News front page in
 bun run seed-load       # a 5000-item load-test brain in .data/load, beside the real one
 bun run frames          # GPUI draw times per route, against a copy of the data
@@ -85,7 +85,7 @@ keyword search still works — the Models panel says what to run.
 ```
   app.ts                 Bun guard → create_app() → render_hot(App.svelte, { props: { app } })
   standalone.ts          the compiled entry: static imports, render() instead of render_hot()
-  build.ts               standalone.ts → dist/substrate → dist/Substrate.app (bun run build)
+  build.ts               standalone.ts → dist/strata → dist/Strata.app (bun run build)
   App.svelte             root layout, window-level shortcuts, the palette → set_css_vars, route table
   RouteView.svelte       resolves the route and lazy-loads the page component
   routes/                Everything, Kind, Search, Item, Ask, Feeds, Settings, NotFound; Item renders a
@@ -109,10 +109,10 @@ keyword search still works — the Models panel says what to run.
                          load-test brain from Wikipedia, picsum.photos and `say`
   test/                  brain.ts (data + native, no models) and smoke.ts (headless UI)
   icon.svg / icon.png    the logo; the .app's icon is cut from the PNG
-  .data/                 gitignored: substrate.sqlite, cache/, models/, tmp/
+  .data/                 gitignored: strata.sqlite, cache/, models/, tmp/
 ```
 
-**`substrate.sqlite` is the whole brain.** Images, thumbnails and recordings are rows in a
+**`strata.sqlite` is the whole brain.** Images, thumbnails and recordings are rows in a
 `blobs` table, not files beside the database, so copying that one file moves everything —
 which is also why `bun run frames` can point a window at a `VACUUM INTO` copy and still
 paint. GPUI's `<img src>`, `afplay` and the worker all want a real path, so `lib/blobs.ts`
@@ -144,14 +144,15 @@ since it is the one way to be sure WebGPU's buffers go back.
 ## The macOS app
 
 `bun run build` runs `build.ts`: `Bun.build({ compile })` over
-`standalone.ts` gives `dist/substrate`, then `dist/Substrate.app` is assembled around it.
+`standalone.ts` gives `dist/strata`, then `dist/Strata.app` is assembled around it.
 transformers.js cannot be compiled into a Bun binary (onnxruntime's dylib and sharp's addon are
 not embedded — [huggingface/transformers.js#1672](https://github.com/huggingface/transformers.js/issues/1672)),
 and it never needs to be: the worker ships as source with its `node_modules` in
 `Contents/Resources/ml`, and the app launches it on its **own embedded Bun** by setting
 `BUN_BE_BUN=1`, which makes a compiled Bun executable behave as the plain `bun` CLI. The
 recorder shim is compiled at build time into `Contents/Resources/native`. Data lives in
-`~/Library/Application Support/Substrate`. `CODESIGN_IDENTITY` and `NOTARY_PROFILE` sign
+`~/Library/Application Support/Strata`, where `lib/paths.ts` moves a `Substrate` folder from
+before the rename. `CODESIGN_IDENTITY` and `NOTARY_PROFILE` sign
 (nested addons first, then the executable, then the bundle) and notarize, as gpuix-svelte's
 [shipping guide](https://github.com/khromov/gpuix-svelte/blob/main/docs/shipping.md) describes.
 The bundle is ~250 MB, most of it onnxruntime and sharp prebuilds.
@@ -172,12 +173,12 @@ All optional, all `GPUIX_BRAIN_*`:
 | `FEEDS=0` | no scheduled feed polling (manual refresh still works); implied by `OFFLINE=1` |
 | `LLM_PROVIDER=local\|openai` | override the Language model choice in Settings |
 | `LLM_URL`, `LLM_KEY`, `LLM_MODEL` | override Settings; the key never has to be stored |
-| `GEMMA_URL` | where Gemma's files download from instead of Substrate's mirror (`<url>/config.json`, `<url>/onnx/…`; the list is `GEMMA_FILES` in `lib/llm-local.ts`) |
+| `GEMMA_URL` | where Gemma's files download from instead of Strata's mirror (`<url>/config.json`, `<url>/onnx/…`; the list is `GEMMA_FILES` in `lib/llm-local.ts`) |
 | `RESOURCES=/path` | where a compiled app's worker and shim live (auto-detected inside a .app) |
 | `DEBUG=1` | verbose logging |
 
 `GPUIX_SCREENSHOT=/tmp/x.png` and `GPUIX_FPS=1` (GPUI's draw-time overlay) work as everywhere else. The API key lives in plain text in
-`substrate.sqlite` when set through Settings; use `GPUIX_BRAIN_LLM_KEY` to keep it out.
+`strata.sqlite` when set through Settings; use `GPUIX_BRAIN_LLM_KEY` to keep it out.
 
 ## Things GPUI has no API for, and what stands in
 
@@ -188,7 +189,7 @@ All optional, all `GPUIX_BRAIN_*`:
 | clipboard | `pbpaste`/`pbcopy` on macOS and `Get-Clipboard`/`Set-Clipboard` on Windows for text, `Bun.Image.fromClipboard()` for images |
 | audio playback | `afplay` on macOS, `paplay`/`ffplay`/`aplay` on Linux; on Windows the clip is decoded in-process and pushed to winmm's waveOut (`lib/player-win.ts`), since nothing ships with Windows that plays an MP3 from a command line without opening a window |
 | system dark mode | `defaults read -g AppleInterfaceStyle` on macOS, `gsettings` on Linux, a `reg query` on Windows; polled every 3 s |
-| decoding audio | a hand-written WAV parser (`lib/wav.ts`) and mpg123 as WebAssembly for MP3 (`lib/mp3.ts`). WAV and MP3 are the two formats Substrate imports, and both are handled in-process — there is no ffmpeg to install |
+| decoding audio | a hand-written WAV parser (`lib/wav.ts`) and mpg123 as WebAssembly for MP3 (`lib/mp3.ts`). WAV and MP3 are the two formats Strata imports, and both are handled in-process — there is no ffmpeg to install |
 | readable text from a page | one synchronous `HTMLRewriter` pass (`lib/scrape.ts`) that scores candidate containers. lol-html keeps one `onEndTag` callback per element and the element handle is dead inside it — `scrape.ts` shows the way around |
 | AVIF / HEIC on screen | GPUI's image crate cannot decode them; `Bun.Image` (ImageIO) stores a WebP display copy beside the original |
 | shrinking a recording | LAME as WebAssembly (`wasm-media-encoders`, `lib/mp3.ts`): once the transcript exists, a memo the app recorded itself is re-encoded from 16 kHz PCM to 32 kbps MP3 in place, about eight times smaller, and mpg123 decodes it back if it is ever re-transcribed. An imported file is the user's master and is never rewritten |
@@ -197,7 +198,7 @@ All optional, all `GPUIX_BRAIN_*`:
 
 ## About client-side routers
 
-Substrate hand-rolls its router (`lib/router.svelte.ts`, ~60 lines: a `$state` route, a back
+Strata hand-rolls its router (`lib/router.svelte.ts`, ~60 lines: a `$state` route, a back
 stack, `:param` matching, lazy `import()`). Eight popular Svelte routers were evaluated first;
 only **svelte-spa-router 5** compiles under the custom renderer and can run here, and only with
 a fake `window`/`history` on `globalThis` plus `--conditions svelte` on the run script, since its
@@ -228,7 +229,7 @@ globalThis.window = {
 };
 ```
 
-Substrate does not, because a desktop app wants a back stack rather than hash URLs, and a fake
+Strata does not, because a desktop app wants a back stack rather than hash URLs, and a fake
 `window` in a process whose whole point is "no DOM" is a trap for the next dependency that sniffs
 for one.
 

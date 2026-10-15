@@ -40,7 +40,7 @@ const embed = await pipeline('feature-extraction', 'nomic-ai/nomic-embed-text-v1
 lap('embed load', s);
 s = performance.now();
 const e = await embed(
-	['search_document: Substrate remembers everything you pour into it.', 'search_query: what does substrate remember?'],
+	['search_document: Strata remembers everything you pour into it.', 'search_query: what does strata remember?'],
 	{ pooling: 'mean', normalize: true }
 );
 const dim: number = e.dims[1];

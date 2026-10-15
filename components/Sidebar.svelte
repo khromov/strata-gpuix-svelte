@@ -17,7 +17,7 @@
 		blur();
 	}
 
-	const show = (e: GpuixEvent) => open_menu(e, brand_actions(), 'Substrate');
+	const show = (e: GpuixEvent) => open_menu(e, brand_actions(), 'Strata');
 
 	const THEMES: Array<{ value: ThemeMode; icon: IconName }> = [
 		{ value: 'light', icon: 'sun' },
@@ -29,7 +29,7 @@
 <div class="sidebar">
 	<div class="brand" hitbox="self" onclick={(e: GpuixEvent) => (is_secondary(e) ? show(e) : home())} onauxclick={show} testId="brand">
 		<div class="mark"><Icon name="leaf" size={19} tone="onAccent" /></div>
-		<div class="word">Substrate</div>
+		<div class="word">Strata</div>
 	</div>
 
 	<div class="nav">

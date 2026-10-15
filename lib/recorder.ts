@@ -27,8 +27,8 @@ export type PermissionResult = 'authorized' | 'denied' | 'restricted' | 'timeout
 const STATUS: AuthStatus[] = ['notDetermined', 'authorized', 'denied', 'restricted'];
 
 // Windows attributes the access to bun.exe, the runtime the bin spawns — the same wrinkle
-// as macOS granting it to the terminal rather than to Substrate.
-const WINDOWS_HINT = 'allow desktop apps under Settings → Privacy & security → Microphone (Windows grants it to bun.exe, not to Substrate)';
+// as macOS granting it to the terminal rather than to Strata.
+const WINDOWS_HINT = 'allow desktop apps under Settings → Privacy & security → Microphone (Windows grants it to bun.exe, not to Strata)';
 const MACOS_HINT = 'allow your terminal under System Settings → Privacy & Security → Microphone, then relaunch';
 
 export const permission_hint = () => (process.platform === 'win32' ? WINDOWS_HINT : MACOS_HINT);
@@ -98,51 +98,51 @@ async function build(): Promise<Recorder> {
 
 		const { dlopen } = await import('bun:ffi');
 		const lib = dlopen(DYLIB, {
-			substrate_rec_auth_status: { args: [], returns: 'i32' },
-			substrate_rec_request_permission: { args: [], returns: 'i32' },
-			substrate_rec_start: { args: ['cstring'], returns: 'i32' },
-			substrate_rec_stop: { args: [], returns: 'f64' },
-			substrate_rec_is_recording: { args: [], returns: 'i32' },
-			substrate_rec_current_time: { args: [], returns: 'f64' },
-			substrate_rec_level: { args: [], returns: 'f64' },
-			substrate_rec_last_error: { args: [], returns: 'cstring' }
+			strata_rec_auth_status: { args: [], returns: 'i32' },
+			strata_rec_request_permission: { args: [], returns: 'i32' },
+			strata_rec_start: { args: ['cstring'], returns: 'i32' },
+			strata_rec_stop: { args: [], returns: 'f64' },
+			strata_rec_is_recording: { args: [], returns: 'i32' },
+			strata_rec_current_time: { args: [], returns: 'f64' },
+			strata_rec_level: { args: [], returns: 'f64' },
+			strata_rec_last_error: { args: [], returns: 'cstring' }
 		});
 		const s = lib.symbols;
 		let current: string | null = null;
 
 		on_exit(() => {
-			if (s.substrate_rec_is_recording()) s.substrate_rec_stop();
+			if (s.strata_rec_is_recording()) s.strata_rec_stop();
 		});
 
 		return {
 			available: true,
-			authStatus: () => STATUS[s.substrate_rec_auth_status()] ?? 'restricted',
+			authStatus: () => STATUS[s.strata_rec_auth_status()] ?? 'restricted',
 
 			// The prompt is drawn on the run loop the frame loop pumps, so polling is
 			// the only way to wait for it.
 			async requestPermission({ timeoutMs = 120_000 } = {}) {
-				let status = s.substrate_rec_request_permission();
+				let status = s.strata_rec_request_permission();
 				const until = Date.now() + timeoutMs;
 				while (status === 0 && Date.now() < until) {
 					await new Promise((r) => setTimeout(r, 250));
-					status = s.substrate_rec_auth_status();
+					status = s.strata_rec_auth_status();
 				}
 				return status === 0 ? 'timeout' : (STATUS[status] as PermissionResult);
 			},
 
 			start(path: string) {
-				const status = STATUS[s.substrate_rec_auth_status()];
+				const status = STATUS[s.strata_rec_auth_status()];
 				if (status !== 'authorized') {
 					throw new Error(status === 'notDetermined' ? 'microphone permission not granted yet' : `microphone access ${status} — ${MACOS_HINT}`);
 				}
 				mkdirSync(dirname(path), { recursive: true });
-				const code = s.substrate_rec_start(path);
-				if (code !== 0) throw new Error(`${s.substrate_rec_last_error()} — ${MACOS_HINT}`);
+				const code = s.strata_rec_start(path);
+				if (code !== 0) throw new Error(`${s.strata_rec_last_error()} — ${MACOS_HINT}`);
 				current = path;
 			},
 
 			async stop() {
-				const seconds = s.substrate_rec_stop();
+				const seconds = s.strata_rec_stop();
 				const path = current;
 				current = null;
 				// The header is finalised by stop(); give the file system a beat to agree.
@@ -153,9 +153,9 @@ async function build(): Promise<Recorder> {
 				return seconds;
 			},
 
-			level: () => Math.max(0, Math.min(1, (s.substrate_rec_level() + 60) / 60)),
-			elapsed: () => s.substrate_rec_current_time(),
-			isRecording: () => s.substrate_rec_is_recording() === 1
+			level: () => Math.max(0, Math.min(1, (s.strata_rec_level() + 60) / 60)),
+			elapsed: () => s.strata_rec_current_time(),
+			isRecording: () => s.strata_rec_is_recording() === 1
 		};
 	} catch (err) {
 		warn('recorder unavailable:', (err as Error).message);

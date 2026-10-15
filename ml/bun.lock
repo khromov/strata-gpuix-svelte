@@ -3,7 +3,7 @@
   "configVersion": 1,
   "workspaces": {
     "": {
-      "name": "substrate-ml",
+      "name": "strata-ml",
       "dependencies": {
         "@huggingface/transformers": "^4.2.0",
       },

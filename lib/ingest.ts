@@ -171,7 +171,7 @@ export function create_ingestor({ store, blobs, vectors, images, ml, media, sett
 	}
 
 	/**
-	 * Once the transcript exists the PCM is dead weight. A memo Substrate recorded itself is
+	 * Once the transcript exists the PCM is dead weight. A memo Strata recorded itself is
 	 * re-encoded to MP3 in its place; anything the user imported is left byte-exact.
 	 */
 	async function compact_step(item: Item) {

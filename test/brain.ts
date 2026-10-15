@@ -572,7 +572,7 @@ const fixture_fetch: Fetcher = async (url) => {
     headers: { "content-type": "text/html; charset=utf-8" },
   });
 };
-const dir = mkdtempSync(join(tmpdir(), "substrate-test-"));
+const dir = mkdtempSync(join(tmpdir(), "strata-test-"));
 {
   const ml = new MlStub();
   const app = await create_app({ data_dir: dir, ml, fetch: fixture_fetch });
@@ -1008,7 +1008,7 @@ const feed_fetch: Fetcher = async (url) => {
 }
 
 {
-  const feed_dir = mkdtempSync(join(tmpdir(), "substrate-feeds-"));
+  const feed_dir = mkdtempSync(join(tmpdir(), "strata-feeds-"));
   const app = await create_app({
     data_dir: feed_dir,
     ml: new MlStub(),
@@ -1224,7 +1224,7 @@ const feed_fetch: Fetcher = async (url) => {
 {
   const local = new LocalStub();
   const app = await create_app({
-    data_dir: mkdtempSync(join(tmpdir(), "substrate-llm-")),
+    data_dir: mkdtempSync(join(tmpdir(), "strata-llm-")),
     ml: new MlStub(),
     local,
     fetch: fixture_fetch,
@@ -1263,7 +1263,7 @@ const feed_fetch: Fetcher = async (url) => {
 }
 {
   const app = await create_app({
-    data_dir: mkdtempSync(join(tmpdir(), "substrate-llm-off-")),
+    data_dir: mkdtempSync(join(tmpdir(), "strata-llm-off-")),
     ml: new MlStub({ available: false, reason: "ML disabled for the test" }),
     fetch: fixture_fetch,
   });
@@ -1279,7 +1279,7 @@ const feed_fetch: Fetcher = async (url) => {
   const states: string[] = [];
   const llm = new LocalLlm({
     worker_path: fileURLToPath(new URL("./fake-llm-worker.ts", import.meta.url)),
-    models_dir: mkdtempSync(join(tmpdir(), "substrate-gemma-")),
+    models_dir: mkdtempSync(join(tmpdir(), "strata-gemma-")),
     on_status: (s) => states.push(s.state),
   });
   check("nothing runs before the first request", llm.status.state, "unloaded");

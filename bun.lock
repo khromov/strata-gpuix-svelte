@@ -3,7 +3,7 @@
   "configVersion": 1,
   "workspaces": {
     "": {
-      "name": "substrate-gpuix-svelte",
+      "name": "strata-gpuix-svelte",
       "dependencies": {
         "croner": "^10.0.1",
         "gpuix-svelte": "^0.2.0",

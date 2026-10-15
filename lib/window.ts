@@ -1,6 +1,6 @@
 export const WINDOW = {
-	title: 'Substrate',
-	appName: 'Substrate',
+	title: 'Strata',
+	appName: 'Strata',
 	width: 1180,
 	height: 780,
 	minWidth: 900,

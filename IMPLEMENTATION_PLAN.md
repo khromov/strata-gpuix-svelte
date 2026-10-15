@@ -1,8 +1,8 @@
-# Substrate Sync: implementation plan
+# Strata Sync: implementation plan
 
 | | |
 |---|---|
-| Scope | a sync engine inside Substrate (endpoint + secret key in Settings) and a hosted, multi-tenant sync server; both run on Bun |
+| Scope | a sync engine inside Strata (endpoint + secret key in Settings) and a hosted, multi-tenant sync server; both run on Bun |
 | Model | row-level sync over a client-side change log, originals content-addressed by SHA-256, last-writer-wins on an edit clock |
 | Out of scope | billing, a web UI over the hosted data, end-to-end encryption (the protocol leaves room for it, see "Later") |
 | Files | as of `a0fe07f` |
@@ -100,7 +100,7 @@ self-hosters work and nobody ships a key in clear across a café.
 
 Errors: 401 unknown key, 403 revoked key or suspended user, 409 `{ error: 'resync' }` when
 `since` is older than the tombstone horizon, 413 body over the blob limit, 429 rate limited,
-507 over quota. Every response carries `X-Substrate-Version: 1`; a client that sees a higher
+507 over quota. Every response carries `X-Strata-Version: 1`; a client that sees a higher
 major stops and tells the user to update.
 
 **Push, server side**, one transaction per request, one decision per row:
@@ -333,16 +333,16 @@ everyone. Deleting them again by hand is the remedy. Documented in README when b
 
 ### Limits and abuse
 
-`maxRequestBodySize` for blob routes from `SUBSTRATE_SYNC_MAX_BLOB` (default 256 MB); JSON
+`maxRequestBodySize` for blob routes from `STRATA_SYNC_MAX_BLOB` (default 256 MB); JSON
 routes capped at 4 MB. A per-key token bucket in memory (600 requests a minute) answers 429.
 Logs carry the key id, never the key. Suspending a user answers 403 to every route without
 touching their files.
 
 ### Deploy
 
-`bun build --compile server/main.ts --outfile dist/substrate-sync`: `bun:sqlite` embeds
-fine, so the artifact is one binary plus a data directory. Env: `SUBSTRATE_SYNC_DIR`,
-`SUBSTRATE_SYNC_PORT`, `SUBSTRATE_SYNC_MAX_BLOB`. Run under systemd behind Caddy for TLS on
+`bun build --compile server/main.ts --outfile dist/strata-sync`: `bun:sqlite` embeds
+fine, so the artifact is one binary plus a data directory. Env: `STRATA_SYNC_DIR`,
+`STRATA_SYNC_PORT`, `STRATA_SYNC_MAX_BLOB`. Run under systemd behind Caddy for TLS on
 any VPS with a persistent disk. Backups: Litestream over `control.sqlite` and the tenant
 files (plain SQLite in WAL mode, so the one-writer WAL-shipping tool is exactly right on
 this side), or a nightly `VACUUM INTO` of each tenant to object storage. Blob directories go

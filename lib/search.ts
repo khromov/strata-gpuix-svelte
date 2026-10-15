@@ -32,7 +32,8 @@ export interface SearchResult {
 }
 
 export interface ChunkHit {
-	chunk: ChunkDetail;
+	/** Null for an image found by what it shows that has no description to read. */
+	chunk: ChunkDetail | null;
 	item: Item;
 	score: number;
 	signals: string[];
@@ -73,6 +74,20 @@ export function create_search({ store, vectors, images, ml, settings }: { store:
 			if (!best.has(hit.group)) best.set(hit.group, { id: hit.group, chunk_id: hit.id, score: hit.score });
 		}
 		return [...best.values()];
+	}
+
+	/**
+	 * Images by what they show, item ids as the ranking key. A bare word scores well under a
+	 * caption ("dog" misses a dog photo that "a photo of dog" finds), while a long query can
+	 * read worse as one, so both phrasings search and each image keeps its better score.
+	 */
+	async function clip_ranking(q: string, k: number, filter: ((group: number) => boolean) | null): Promise<Ranked[]> {
+		const phrasings = [...new Set([q, clip_caption(q)])];
+		const best = new Map<number, number>();
+		for (const vec of await Promise.all(phrasings.map((text) => ml.clip_text(text)))) {
+			for (const h of images.top_k(vec, k, { min_score: threshold('clip'), filter })) best.set(h.group, Math.max(h.score, best.get(h.group) ?? -1));
+		}
+		return [...best].map(([id, score]) => ({ id, score })).sort((a, b) => b.score - a.score).slice(0, k);
 	}
 
 	/**
@@ -129,19 +144,9 @@ export function create_search({ store, vectors, images, ml, settings }: { store:
 
 		if (signals.includes('clip') && (!kinds || kinds.includes('image')) && images.size > 0) {
 			if (usable('clip')) {
-				// A bare word scores well under a caption ("dog" misses a dog photo that
-				// "a photo of dog" finds), while a long query can read worse as one, so both
-				// phrasings search and each image keeps its better score.
-				const phrasings = [...new Set([q, clip_caption(q)])];
 				tasks.push(
-					Promise.all(phrasings.map((text) => ml.clip_text(text)))
-						.then((vecs) => {
-							const best = new Map<number, number>();
-							for (const vec of vecs) {
-								for (const h of images.top_k(vec, limit, { min_score: threshold('clip'), filter: exclude })) best.set(h.group, Math.max(h.score, best.get(h.group) ?? -1));
-							}
-							rankings.clip = [...best].map(([id, score]) => ({ id, score })).sort((a, b) => b.score - a.score).slice(0, limit);
-						})
+					clip_ranking(q, limit, exclude)
+						.then((r) => (rankings.clip = r))
 						.catch((err) => {
 							warn('image search failed:', (err as Error).message);
 							degraded.push('clip');
@@ -172,13 +177,25 @@ export function create_search({ store, vectors, images, ml, settings }: { store:
 		return { hits: normalize_scores(hits), degraded, terms, kinds, text: q };
 	}
 
-	/** Chunk-level retrieval for RAG: several chunks of one item may all be relevant. */
+	/**
+	 * Chunk-level retrieval for RAG: several chunks of one item may all be relevant. An image
+	 * Search would find by what it shows is found here too: as its description's first chunk,
+	 * or, never described, with `chunk: null` (ranked under its negated item id).
+	 */
 	async function search_chunks(query: string, { k = 12, feeds: feeds_opt }: { k?: number; feeds?: boolean } = {}): Promise<ChunkHit[]> {
 		const q = query.trim();
 		if (!q) return [];
 		const with_feeds = feeds_opt ?? include_feeds();
 		const exclude = feed_filter(with_feeds);
-		const rankings: { vector?: Ranked[]; fts?: Ranked[] } = {};
+		const rankings: { vector?: Ranked[]; fts?: Ranked[]; clip?: Ranked[] } = {};
+		// Started first: CLIP runs while the embedder does, in the same worker queue.
+		const pictures =
+			images.size > 0 && usable('clip')
+				? clip_ranking(q, k, exclude).catch((err): Ranked[] => {
+						warn('image retrieval failed:', (err as Error).message);
+						return [];
+					})
+				: null;
 		if (usable('embed')) {
 			try {
 				const vec = await ml.embed_query(q);
@@ -195,8 +212,15 @@ export function create_search({ store, vectors, images, ml, settings }: { store:
 				if (first) rankings.fts.push({ id: first.id, score: -row.rank });
 			}
 		}
+		if (pictures) rankings.clip = (await pictures).map((h) => ({ id: store.chunks_of(h.id)[0]?.id ?? -h.id, score: h.score }));
 		const out: ChunkHit[] = [];
 		for (const f of rrf(rankings)) {
+			if (f.id < 0) {
+				const item = store.get_item(-f.id);
+				if (item) out.push({ chunk: null, item, score: f.score, signals: f.signals });
+				if (out.length >= k) break;
+				continue;
+			}
 			const chunk = store.get_chunk(f.id);
 			if (!chunk) continue;
 			const item = store.get_item(chunk.item_id);

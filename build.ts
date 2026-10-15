@@ -1,5 +1,5 @@
 /**
- * Substrate → dist/substrate + dist/Substrate.app. transformers.js cannot be
+ * Strata → dist/strata + dist/Strata.app. transformers.js cannot be
  * compiled into a Bun binary (huggingface/transformers.js#1672: onnxruntime's
  * dylib and sharp's addon are not embedded), and it never has to be: the models run
  * in a child process, so the worker ships as source with its node_modules in
@@ -17,14 +17,14 @@ if (!process.versions.bun) {
 	process.exit(1);
 }
 if (process.platform !== 'darwin') {
-	console.error(`[build] Substrate's build makes a macOS .app (AVFoundation recorder, Metal); nothing to build on ${process.platform}`);
+	console.error(`[build] Strata's build makes a macOS .app (AVFoundation recorder, Metal); nothing to build on ${process.platform}`);
 	process.exit(1);
 }
 
 const root = fileURLToPath(new URL('./', import.meta.url));
 const dist = join(root, 'dist');
-const binary = join(dist, 'substrate');
-const bundle = join(dist, 'Substrate.app');
+const binary = join(dist, 'strata');
+const bundle = join(dist, 'Strata.app');
 const identity = process.env.CODESIGN_IDENTITY;
 const notary = process.env.NOTARY_PROFILE;
 
@@ -38,15 +38,15 @@ const PLIST = `<?xml version="1.0" encoding="UTF-8"?>
 <plist version="1.0">
 <dict>
 	<key>CFBundleExecutable</key>
-	<string>substrate</string>
+	<string>strata</string>
 	<key>CFBundleIconFile</key>
 	<string>AppIcon</string>
 	<key>CFBundleIdentifier</key>
-	<string>dev.gpuix.svelte.substrate</string>
+	<string>dev.gpuix.svelte.strata</string>
 	<key>CFBundleName</key>
-	<string>Substrate</string>
+	<string>Strata</string>
 	<key>CFBundleDisplayName</key>
-	<string>Substrate</string>
+	<string>Strata</string>
 	<key>CFBundleShortVersionString</key>
 	<string>0.1.0</string>
 	<key>CFBundleVersion</key>
@@ -58,7 +58,7 @@ const PLIST = `<?xml version="1.0" encoding="UTF-8"?>
 	<key>NSHighResolutionCapable</key>
 	<true/>
 	<key>NSMicrophoneUsageDescription</key>
-	<string>Substrate records voice memos and transcribes them on this Mac.</string>
+	<string>Strata records voice memos and transcribes them on this Mac.</string>
 </dict>
 </plist>
 `;
@@ -162,8 +162,8 @@ const resources = join(bundle, 'Contents', 'Resources');
 mkdirSync(macos, { recursive: true });
 mkdirSync(join(resources, 'ml'), { recursive: true });
 mkdirSync(join(resources, 'native'), { recursive: true });
-copyFileSync(binary, join(macos, 'substrate'));
-chmodSync(join(macos, 'substrate'), 0o755);
+copyFileSync(binary, join(macos, 'strata'));
+chmodSync(join(macos, 'strata'), 0o755);
 writeFileSync(join(bundle, 'Contents', 'Info.plist'), PLIST);
 write_icns(join(root, 'icon.png'), join(resources, 'AppIcon.icns'));
 
@@ -282,14 +282,14 @@ function sign_bundle() {
 	for (const target of nested) {
 		run('codesign', ['--force', '--options', 'runtime', '--timestamp', '--sign', identity!, target]);
 	}
-	run('codesign', ['--force', '--options', 'runtime', '--timestamp', '--entitlements', entitlements, '--sign', identity!, join(macos, 'substrate')]);
+	run('codesign', ['--force', '--options', 'runtime', '--timestamp', '--entitlements', entitlements, '--sign', identity!, join(macos, 'strata')]);
 	run('codesign', ['--force', '--options', 'runtime', '--timestamp', '--entitlements', entitlements, '--sign', identity!, bundle]);
 	run('codesign', ['--verify', '--strict', bundle]);
 	console.log(`[build] signed ${relative(root, bundle)} (${nested.length} nested binaries) as ${identity}`);
 }
 
 function notarize(target: string) {
-	const zip = join(dist, 'Substrate.zip');
+	const zip = join(dist, 'Strata.zip');
 	run('ditto', ['-c', '-k', '--keepParent', target, zip]);
 	console.log('[build] notarizing (Apple usually takes a few minutes)');
 	const output = run('xcrun', ['notarytool', 'submit', zip, '--keychain-profile', notary!, '--wait']);

@@ -1,5 +1,5 @@
 /**
- * The UI headlessly: mount Substrate with a stubbed worker, capture a note through
+ * The UI headlessly: mount Strata with a stubbed worker, capture a note through
  * GPUI's real hit testing, open it, go back with Escape, and delete it through
  * the confirm dialog.
  */
@@ -49,7 +49,7 @@ const RSS = `<rss version="2.0"><channel><title>Newsonaut</title><link>https://f
 <description>Fungal networks trade sugar for phosphorus.</description></item></channel></rss>`;
 
 const app = await create_app({
-	data_dir: mkdtempSync(join(tmpdir(), 'substrate-smoke-')),
+	data_dir: mkdtempSync(join(tmpdir(), 'strata-smoke-')),
 	ml: new MlStub(),
 	seed: true,
 	fetch: async (url) =>
@@ -78,7 +78,7 @@ const eventually = (pred: () => unknown) => wait_for(pred).then(
 
 await wait();
 await wait();
-check('brand painted', painted().includes('Substrate'));
+check('brand painted', painted().includes('Strata'));
 // Off-screen rows of the virtual timeline are retained but not painted.
 check('seeded note in the timeline', all_text().some((t) => t.includes('Compost notes')));
 check('sidebar counts painted', painted().includes('Everything'));
@@ -163,10 +163,10 @@ check('and then deletes', app.get_item(scratch.id), null);
 
 await tap('Buy compost for the raised beds');
 await wait();
-await tap('Substrate');
+await tap('Strata');
 check('brand click goes home', route.path, '/');
 
-await tap('Substrate', { button: 2 });
+await tap('Strata', { button: 2 });
 check('the brand menu marks the theme in force', painted().includes('✓'));
 press('escape');
 await wait();
@@ -209,7 +209,7 @@ body_list.children!.forEach((row, i) => {
 native.scrollToItem(body_list.id, last_block);
 await wait();
 check('scrolling to the end paints the last block', painted().includes('Paragraph 149 of the long page.'));
-await tap('Substrate');
+await tap('Strata');
 
 // Tab reaches keydown as an ordinary key; App walks the window's fields with focus_next().
 const search_input = find((n) => n.type === 'input');
@@ -230,7 +230,7 @@ check('and leaves focus in the search box', focused_element()?.nativeId, search_
 await tap('kind:image');
 await wait(250);
 check('completion searches by kind', route.path === '/search' && route.query.q, 'kind:image');
-check('kind listing paints the image', painted().includes('Substrate icon'));
+check('kind listing paints the image', painted().includes('Strata icon'));
 // The thumbnail is a row in the database until something asks for a path, so an <img>
 // in the tree at all is the proof that the blob reached the cache.
 check('the thumbnail blob materialised into an <img>', find_all((n) => n.type === 'img').length > 0);
@@ -334,7 +334,7 @@ check('settings carries the same switch', find_test_id('settings-feeds') != null
 // The tick is a filled box, so the palette's accent is what says the switch is on.
 check('and it carries what search just set', find_test_id('settings-feeds')?.children?.[0]?.style?.backgroundColor, DARK.accent);
 
-console.log('screenshot:', screenshot(join(tmpdir(), 'substrate-smoke.png')));
+console.log('screenshot:', screenshot(join(tmpdir(), 'strata-smoke.png')));
 
 app.close();
 finish('smoke', 81);

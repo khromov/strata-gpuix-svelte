@@ -25,7 +25,7 @@ export function picker_available(): { ok: boolean; reason?: string } {
 }
 
 /** Empty on cancel. */
-export async function choose_files({ kinds = 'any', multiple = false, prompt = 'Add to Substrate' }: Partial<ChooseOptions> = {}): Promise<string[]> {
+export async function choose_files({ kinds = 'any', multiple = false, prompt = 'Add to Strata' }: Partial<ChooseOptions> = {}): Promise<string[]> {
 	if (process.platform === 'darwin') return choose_mac({ kinds, multiple, prompt });
 	if (process.platform === 'linux') return choose_linux({ kinds, multiple, prompt });
 	throw new Error(picker_available().reason);
@@ -54,7 +54,7 @@ async function choose_mac({ kinds, multiple, prompt }: ChooseOptions): Promise<s
 }
 
 /** Empty on cancel. The bytes live in the database, so saving one out is an export. */
-export async function choose_save_path(name: string, { prompt = 'Export from Substrate' }: { prompt?: string } = {}): Promise<string> {
+export async function choose_save_path(name: string, { prompt = 'Export from Strata' }: { prompt?: string } = {}): Promise<string> {
 	if (process.platform === 'darwin') {
 		const lines = [`return POSIX path of (choose file name with prompt "${escape_applescript(prompt)}" default name "${escape_applescript(name)}")`];
 		const { stdout, stderr, code } = await run(['osascript', ...lines.flatMap((line) => ['-e', line])]);

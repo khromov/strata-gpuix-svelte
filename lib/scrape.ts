@@ -26,7 +26,7 @@ interface Span {
 }
 
 const UA =
-	'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36 Substrate/0.1';
+	'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36 Strata/0.1';
 
 const DROP = [
 	'script', 'style', 'noscript', 'template', 'nav', 'body > header', 'footer', 'aside', 'form', 'iframe', 'svg',

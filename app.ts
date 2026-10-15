@@ -4,7 +4,7 @@
  */
 
 if (!process.versions.bun) {
-	console.error('[substrate] Substrate needs Bun — `bun run start` runs `gpuix-svelte --bun app.ts`');
+	console.error('[strata] Strata needs Bun — `bun run start` runs `gpuix-svelte --bun app.ts`');
 	process.exit(1);
 }
 

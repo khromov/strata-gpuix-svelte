@@ -39,7 +39,7 @@ const MAX_BYTES = 8_000_000;
 // A boot with ten feeds should not be ten simultaneous fetches.
 const CATCH_UP_STAGGER_MS = 4_000;
 
-const USER_AGENT = 'Substrate/0.1 (+https://github.com/khromov/gpuix-svelte)';
+const USER_AGENT = 'Strata/0.1 (+https://github.com/khromov/gpuix-svelte)';
 
 const excerpt = (text: string, max = 200): string => (text.length > max ? `${text.slice(0, max - 1).replace(/\s\S*$/, '')}…` : text);
 
