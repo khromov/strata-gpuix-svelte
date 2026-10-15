@@ -172,7 +172,7 @@ All optional, all `GPUIX_BRAIN_*`:
 | `FEEDS=0` | no scheduled feed polling (manual refresh still works); implied by `OFFLINE=1` |
 | `LLM_PROVIDER=local\|openai` | override the Language model choice in Settings |
 | `LLM_URL`, `LLM_KEY`, `LLM_MODEL` | override Settings; the key never has to be stored |
-| `GEMMA_URL` | where Gemma's files download from (`<url>/config.json`, `<url>/onnx/…`; the list is `GEMMA_FILES` in `lib/llm-local.ts`) |
+| `GEMMA_URL` | where Gemma's files download from instead of Substrate's mirror (`<url>/config.json`, `<url>/onnx/…`; the list is `GEMMA_FILES` in `lib/llm-local.ts`) |
 | `RESOURCES=/path` | where a compiled app's worker and shim live (auto-detected inside a .app) |
 | `DEBUG=1` | verbose logging |
 

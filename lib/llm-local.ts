@@ -17,9 +17,10 @@ export const GEMMA_ID = 'onnx-community/gemma-4-E4B-it-ONNX';
 export const GEMMA_NAME = 'Gemma 4 E4B';
 /**
  * Where the files download from: each path in GEMMA_FILES under it, `onnx/` kept.
- * GPUIX_BRAIN_GEMMA_URL overrides it. The default pins the Hugging Face revision.
+ * GPUIX_BRAIN_GEMMA_URL overrides it. A mirror of the Hugging Face repo at revision
+ * 2b6d2e26a962f70a33da8f7cd81e1afdd8d9cfb2; it must answer `Range: bytes=0-0`.
  */
-export const GEMMA_URL = 'https://huggingface.co/onnx-community/gemma-4-E4B-it-ONNX/resolve/2b6d2e26a962f70a33da8f7cd81e1afdd8d9cfb2';
+export const GEMMA_URL = 'https://sta-public.fra1.cdn.digitaloceanspaces.com/onnx-community/gemma-4-E4B-it-ONNX';
 /**
  * Everything the worker reads: q4f16 weights for WebGPU. Substrate never sends audio, but
  * transformers.js loads every session the model declares, so the audio encoder comes too.
