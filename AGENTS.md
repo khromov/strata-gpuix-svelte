@@ -56,6 +56,15 @@ fake data and a stub worker — screenshots), `START=/settings`, `THEME=light|da
   `lib/llms.ts` hands out Gemma or the OpenAI-compatible endpoint per request (`settings.provider()`);
   the prompts themselves (`llm_tasks` in `lib/llm.ts`) are shared. Beside an `MlStub`, the app gets a
   `LocalStub` that streams a canned answer, so tests and `STUB=1` never load Gemma.
+- A GPU job that never finishes cannot be cancelled: its process stays stuck exiting with the GPU
+  at 100%, and one took the development Mac down. Gemma's safeguards (limits in `lib/llm-local.ts`):
+  prompts over 3072 tokens are refused before they reach the GPU (Ask and Summarize halve their
+  text and retry, `shrinking` in `lib/llm.ts`), a generation is cut off at its first `<unusedN>`
+  junk token or after 3 minutes, a busy worker whose 5-second heartbeat stops for 60 s is
+  SIGKILLed, and after any of those Gemma stays off until the app restarts. A lock file in the
+  models directory (`gemma.lock`) keeps a second process from loading Gemma beside one, stuck or not.
+- **Never load the real Gemma from a script or test without asking first**: use `LocalStub` or
+  `test/fake-llm-worker.ts`.
 - `strata.sqlite` is the master record: media are blob rows, and `<data-dir>/cache` is a
   disposable extraction of them (`lib/blobs.ts`).
 - RSS/Atom feeds are polled on a per-feed cron (croner, in-process), in or out of the

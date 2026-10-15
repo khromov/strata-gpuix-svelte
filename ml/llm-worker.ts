@@ -2,9 +2,27 @@
  * Gemma 4 E4B over transformers.js on WebGPU (Metal on macOS), one generation at a
  * time. The weights download into the models directory on the first request. After
  * IDLE_EXIT_MS without one the process exits, which hands back all ~6 GB at once.
+ * The safeguards around the GPU are described beside their limits in lib/llm-local.ts.
  */
 
-import { GEMMA_BYTES, GEMMA_ID, GEMMA_NAME, GEMMA_URL, gemma_downloaded, gemma_messages, type LlmJob, type LlmMessage, type LlmRequest, type LlmResults } from '../lib/llm-local.ts';
+import { join } from 'node:path';
+import {
+	claim_gemma_lock,
+	GEMMA_BYTES,
+	GEMMA_GENERATION_BUDGET_MS,
+	GEMMA_ID,
+	GEMMA_MAX_PROMPT_TOKENS,
+	GEMMA_NAME,
+	GEMMA_URL,
+	gemma_downloaded,
+	gemma_messages,
+	is_degenerate,
+	release_gemma_lock,
+	type LlmJob,
+	type LlmMessage,
+	type LlmRequest,
+	type LlmResults
+} from '../lib/llm-local.ts';
 import type { ModelState } from '../lib/ml-client.ts';
 import type { Failure } from '../lib/types.ts';
 
@@ -26,6 +44,8 @@ env.remoteHost = source.origin;
 env.remotePathTemplate = source.pathname.replace(/^\/+|\/+$/g, '') || '.';
 
 const IDLE_EXIT_MS = 10 * 60_000;
+const LOCK = join(env.cacheDir, 'gemma.lock');
+process.on('exit', () => release_gemma_lock(LOCK));
 
 interface TfProgress {
 	status: string;
@@ -43,6 +63,10 @@ let loading: Promise<Gemma> | null = null;
 let last_used = Date.now();
 
 async function load_gemma(): Promise<Gemma> {
+	const lock = claim_gemma_lock(LOCK);
+	if (!lock.ok) {
+		throw Object.assign(new Error(`${GEMMA_NAME} is already running in another process (pid ${lock.holder}), and only one may use the GPU at a time`), { code: 'BUSY' });
+	}
 	const fetching = !gemma_downloaded(env.cacheDir);
 	if (fetching && !env.allowRemoteModels) {
 		throw Object.assign(new Error(`${GEMMA_NAME} is not downloaded, and GPUIX_BRAIN_OFFLINE=1 forbids it`), { code: 'MODEL_LOAD' });
@@ -115,22 +139,46 @@ const handlers = {
 		const prompt = processor.apply_chat_template(messages, { enable_thinking: false, add_generation_prompt: true });
 		const pictures = images.length ? await Promise.all(images.map(read_image)) : null;
 		const inputs = await processor(prompt, pictures, null, { add_special_tokens: false });
+		const prompt_tokens: number = inputs.input_ids.dims.at(-1);
+		// Refused before anything reaches the GPU; callers shrink the text and ask again.
+		if (prompt_tokens > GEMMA_MAX_PROMPT_TOKENS) {
+			throw Object.assign(new Error(`the prompt is ${prompt_tokens} tokens, over the ${GEMMA_MAX_PROMPT_TOKENS} ${GEMMA_NAME} takes`), { code: 'TOO_LONG' });
+		}
+		let written = '';
+		let stopped: 'DEGENERATE' | 'TIME_BUDGET' | null = null;
+		const stop = (why: 'DEGENERATE' | 'TIME_BUDGET') => {
+			stopped ??= why;
+			stopper.interrupt();
+		};
 		const streamer = new TextStreamer(processor.tokenizer, {
 			skip_prompt: true,
 			skip_special_tokens: true,
-			callback_function: (text: string) => send({ type: 'token', id: job.id, text })
+			callback_function: (text: string) => {
+				written += text;
+				if (is_degenerate(written)) return stop('DEGENERATE');
+				send({ type: 'token', id: job.id, text });
+			}
 		});
 		stopper.reset();
+		// Cannot fire while the JS thread is blocked on the GPU; the parent's heartbeat check covers that.
+		const budget = setTimeout(() => stop('TIME_BUDGET'), GEMMA_GENERATION_BUDGET_MS);
 		const sample = job.temperature > 0;
-		const out = await model.generate({
-			...inputs,
-			max_new_tokens: job.max_tokens,
-			do_sample: sample,
-			...(sample ? { temperature: job.temperature, top_k: 64, top_p: 0.95 } : {}),
-			streamer,
-			stopping_criteria: [stopper]
-		});
-		const [text] = processor.batch_decode(out.slice(null, [inputs.input_ids.dims.at(-1), null]), { skip_special_tokens: true });
+		let out;
+		try {
+			out = await model.generate({
+				...inputs,
+				max_new_tokens: job.max_tokens,
+				do_sample: sample,
+				...(sample ? { temperature: job.temperature, top_k: 64, top_p: 0.95 } : {}),
+				streamer,
+				stopping_criteria: [stopper]
+			});
+		} finally {
+			clearTimeout(budget);
+		}
+		if (stopped === 'DEGENERATE') throw Object.assign(new Error(`${GEMMA_NAME} started writing junk tokens, a sign its GPU work went wrong`), { code: stopped });
+		if (stopped === 'TIME_BUDGET') throw Object.assign(new Error(`${GEMMA_NAME} spent over ${GEMMA_GENERATION_BUDGET_MS / 60_000} minutes on one answer`), { code: stopped });
+		const [text] = processor.batch_decode(out.slice(null, [prompt_tokens, null]), { skip_special_tokens: true });
 		return { text: text.trim() };
 	}
 };
@@ -186,12 +234,13 @@ process.on('message', (msg: LlmRequest) => {
 });
 process.on('disconnect', () => process.exit(0));
 
-// An orphan is reparented to pid 1, and 'disconnect' is not always delivered.
+// An orphan is reparented to pid 1, and 'disconnect' is not always delivered. The 'mem'
+// report doubles as the heartbeat: the parent kills a busy worker that goes quiet.
 setInterval(() => {
 	if (process.ppid === 1) process.exit(0);
-	if (gemma || loading) send({ type: 'mem', rss: process.memoryUsage().rss });
+	send({ type: 'mem', rss: process.memoryUsage().rss });
 	if (!running && !queue.length && !loading && Date.now() - last_used > IDLE_EXIT_MS) process.exit(0);
-}, 10_000);
+}, 5_000);
 process.on('uncaughtException', (err) => {
 	send({ type: 'fatal', error: { message: err.message, stack: err.stack } });
 	process.exit(1);

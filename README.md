@@ -141,6 +141,11 @@ Gemma is the big one: about 6 GB resident while loaded (8 GB after a long prompt
 that only exists between the first request and ten idle minutes later. Exiting is the unload,
 since it is the one way to be sure WebGPU's buffers go back.
 
+A GPU job that never finishes cannot be cancelled, and can freeze the whole machine, so Gemma
+runs fenced in: prompts stay under 3072 tokens, a generation stops at the first junk token or
+after three minutes, a worker that stops answering for a minute is killed, only one process may
+run Gemma at a time, and after any of that it stays off until Strata restarts.
+
 ## The macOS app
 
 `bun run build` runs `build.ts`: `Bun.build({ compile })` over

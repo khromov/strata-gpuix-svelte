@@ -8,6 +8,7 @@ CREATE TABLE items (
   title       TEXT NOT NULL DEFAULT '',
   body        TEXT NOT NULL DEFAULT '',
   source_url  TEXT,
+  feed_id     INTEGER REFERENCES feeds(id) ON DELETE SET NULL,
   file_blob   INTEGER,
   thumb_blob  INTEGER,
   width       INTEGER,
@@ -24,6 +25,7 @@ CREATE UNIQUE INDEX items_url ON items(source_url) WHERE source_url IS NOT NULL;
 CREATE INDEX items_kind_created ON items(kind, created_at DESC);
 CREATE INDEX items_created ON items(created_at DESC);
 CREATE INDEX items_unfinished ON items(status) WHERE status <> 'ready';
+CREATE INDEX items_feed ON items(feed_id) WHERE feed_id IS NOT NULL;
 
 -- Every byte the app owns. Rows are immutable: replacing an item's media inserts a new
 -- row and drops the old one, which is what keeps cache/<id>.<ext> from ever going stale.
@@ -69,8 +71,7 @@ CREATE TRIGGER items_au AFTER UPDATE OF title, body ON items BEGIN
   INSERT INTO items_fts(items_fts, rowid, title, body) VALUES ('delete', old.id, old.title, old.body);
   INSERT INTO items_fts(rowid, title, body) VALUES (new.id, new.title, new.body);
 END;
-`,
-	`
+
 CREATE TABLE feeds (
   id             INTEGER PRIMARY KEY,
   type           TEXT NOT NULL DEFAULT 'rss',
@@ -100,9 +101,6 @@ CREATE TABLE feed_entries (
   PRIMARY KEY (feed_id, guid)
 );
 CREATE INDEX feed_entries_item ON feed_entries(item_id) WHERE item_id IS NOT NULL;
-
-ALTER TABLE items ADD COLUMN feed_id INTEGER REFERENCES feeds(id) ON DELETE SET NULL;
-CREATE INDEX items_feed ON items(feed_id) WHERE feed_id IS NOT NULL;
 `
 ];
 

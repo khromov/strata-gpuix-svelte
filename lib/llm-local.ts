@@ -6,7 +6,7 @@
  */
 
 import type { Subprocess } from 'bun';
-import { existsSync } from 'node:fs';
+import { existsSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { on_exit } from './lifecycle.ts';
 import type { ChatOptions, Message } from './llm.ts';
@@ -44,6 +44,68 @@ export const GEMMA_FILES = [
 	'onnx/audio_encoder_q4f16.onnx_data'
 ];
 export const GEMMA_BYTES = 5_198_343_574;
+
+/**
+ * Safeguards. A GPU job that never finishes cannot be cancelled from userland: its process
+ * stays stuck exiting with the GPU at 100%, and on 2026-10-15 one took the whole Mac down.
+ * So prompts stay small (the worker refuses longer ones before they reach the GPU), a
+ * generation that turns to junk or runs too long is cut off, a worker that falls silent is
+ * killed, and after any of that Gemma stays off until the app restarts.
+ */
+export const GEMMA_MAX_PROMPT_TOKENS = 3072;
+/** Characters of text a prompt carries; English is ~4 a token, so well under the cap. */
+export const GEMMA_PROMPT_CHARS = 6000;
+export const GEMMA_GENERATION_BUDGET_MS = 3 * 60_000;
+/** Silence this long from a worker with work means its JS thread is stuck, likely on the GPU. */
+export const GEMMA_STALL_MS = 60_000;
+/** Worker error codes that mean the GPU work went wrong, so Gemma is stopped and kept off. */
+const STOP_CODES = new Set(['DEGENERATE', 'TIME_BUDGET']);
+
+/** Gemma never writes its `<unusedN>` tokens; seeing one means the GPU computed junk. */
+export const is_degenerate = (text: string) => /<unused\d+>/.test(text);
+
+const alive = (pid: number) => {
+	try {
+		process.kill(pid, 0);
+		return true;
+	} catch (err) {
+		return (err as NodeJS.ErrnoException).code === 'EPERM';
+	}
+};
+
+/**
+ * One Gemma on the GPU per machine: a lock file holding its worker's pid, so a second app
+ * or a script cannot load another beside it. A holder that is gone leaves a stale lock to
+ * take over; one that still exists (even stuck exiting on a hung GPU job) keeps it.
+ */
+export function claim_gemma_lock(path: string, pid = process.pid): { ok: true } | { ok: false; holder: number } {
+	for (let attempt = 0; attempt < 3; attempt++) {
+		try {
+			writeFileSync(path, String(pid), { flag: 'wx' });
+			return { ok: true };
+		} catch (err) {
+			if ((err as NodeJS.ErrnoException).code !== 'EEXIST') throw err;
+		}
+		let holder = 0;
+		try {
+			holder = Number(readFileSync(path, 'utf8')) || 0;
+		} catch {
+			continue;
+		}
+		if (holder === pid) return { ok: true };
+		if (holder && alive(holder)) return { ok: false, holder };
+		rmSync(path, { force: true });
+	}
+	return { ok: false, holder: 0 };
+}
+
+export function release_gemma_lock(path: string, pid = process.pid) {
+	try {
+		if (Number(readFileSync(path, 'utf8')) === pid) rmSync(path, { force: true });
+	} catch {
+		// Already gone.
+	}
+}
 
 /** All of GEMMA_FILES in transformers.js's cache under `models_dir`. */
 export const gemma_downloaded = (models_dir: string) => GEMMA_FILES.every((file) => existsSync(join(models_dir, GEMMA_ID, file)));
@@ -135,6 +197,9 @@ export class LocalLlm implements LocalLike {
 	#next_id = 1;
 	#pending = new Map<number, Pending>();
 	#stopping = false;
+	#stall_ms: number;
+	#last_heard = 0;
+	#watchdog: ReturnType<typeof setInterval> | null = null;
 
 	status: LocalStatus;
 	available = true;
@@ -145,16 +210,19 @@ export class LocalLlm implements LocalLike {
 		worker_path,
 		models_dir,
 		url = process.env.GPUIX_BRAIN_GEMMA_URL || GEMMA_URL,
+		stall_ms = GEMMA_STALL_MS,
 		on_status = () => {}
 	}: {
 		worker_path: string;
 		models_dir: string;
 		url?: string;
+		stall_ms?: number;
 		on_status?: (status: LocalStatus) => void;
 	}) {
 		this.#worker_path = worker_path;
 		this.#models_dir = models_dir;
 		this.#url = url;
+		this.#stall_ms = stall_ms;
 		this.on_status = on_status;
 		this.status = { state: 'unloaded', progress: null, error: null, downloaded: gemma_downloaded(models_dir), rss: null };
 		on_exit(() => this.stop_sync());
@@ -188,6 +256,7 @@ export class LocalLlm implements LocalLike {
 	}
 
 	#receive(msg: LlmMessage) {
+		this.#last_heard = Date.now();
 		if (msg.type === 'hello') {
 			log(`${GEMMA_NAME} worker up (pid ${msg.pid})`);
 			this.#hello?.resolve();
@@ -214,6 +283,7 @@ export class LocalLlm implements LocalLike {
 			job.on_token?.(msg.text);
 			return;
 		}
+		if (!msg.ok && STOP_CODES.has(msg.error?.code ?? '')) return this.#stop_for_safety(msg.error.message);
 		this.#pending.delete(msg.id);
 		if (msg.ok) job.resolve(msg.result);
 		else job.reject(new MlError(msg.error?.message ?? `${GEMMA_NAME} failed`, { code: msg.error?.code, transient: msg.error?.transient }));
@@ -252,6 +322,7 @@ export class LocalLlm implements LocalLike {
 		const id = this.#next_id++;
 		return new Promise<LlmResults[T]>((resolve, reject) => {
 			this.#pending.set(id, { resolve: resolve as (value: unknown) => void, reject, on_token });
+			this.#watch();
 			signal?.addEventListener(
 				'abort',
 				() => {
@@ -263,6 +334,47 @@ export class LocalLlm implements LocalLike {
 			);
 			this.#send({ id, type, ...payload } as LlmJob, id);
 		});
+	}
+
+	/** While anything is pending, the worker's heartbeat ('mem' every few seconds) must keep coming. */
+	#watch() {
+		if (this.#watchdog) return;
+		this.#last_heard = Date.now();
+		this.#watchdog = setInterval(
+			() => {
+				if (!this.#pending.size) {
+					clearInterval(this.#watchdog!);
+					this.#watchdog = null;
+				} else if (Date.now() - this.#last_heard > this.#stall_ms) {
+					this.#stop_for_safety(`${GEMMA_NAME} stopped responding for ${Math.round(this.#stall_ms / 1000)} s`);
+				}
+			},
+			Math.min(5000, this.#stall_ms / 4)
+		);
+	}
+
+	/**
+	 * Kills the worker outright and keeps Gemma off: loading it onto the GPU again beside a
+	 * stuck job is how a bad answer turns into a frozen machine.
+	 */
+	#stop_for_safety(reason: string) {
+		if (!this.available) return;
+		const message = `${reason}, so it was stopped and stays off until Strata restarts`;
+		warn(message);
+		this.available = false;
+		this.reason = message;
+		const proc = this.#proc;
+		// Detached first, so a late onExit (or none, if the process is stuck exiting) changes nothing.
+		this.#proc = null;
+		this.#hello?.reject(new MlError(message, { code: 'LLM_STOPPED' }));
+		this.#hello = null;
+		proc?.kill('SIGKILL');
+		for (const job of this.#pending.values()) job.reject(new MlError(message, { code: 'LLM_STOPPED' }));
+		this.#pending.clear();
+		if (this.#watchdog) clearInterval(this.#watchdog);
+		this.#watchdog = null;
+		this.status = { ...this.status, state: 'error', progress: null, error: message, rss: null };
+		this.#emit();
 	}
 
 	#send(msg: LlmRequest, id?: number) {

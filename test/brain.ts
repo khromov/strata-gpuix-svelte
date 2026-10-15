@@ -19,7 +19,14 @@ import { cited_sources } from "../lib/ask.ts";
 import { markdown_blocks } from "../lib/blocks.ts";
 import { chunk_markdown } from "../lib/chunk.ts";
 import { normalize_base_url, parse_sse } from "../lib/llm.ts";
-import { GEMMA_NAME, gemma_messages, LocalLlm } from "../lib/llm-local.ts";
+import {
+  claim_gemma_lock,
+  GEMMA_NAME,
+  gemma_messages,
+  is_degenerate,
+  LocalLlm,
+  release_gemma_lock,
+} from "../lib/llm-local.ts";
 import { MlClient } from "../lib/ml-client.ts";
 import { LocalStub, MlStub } from "../lib/ml-stub.ts";
 import {
@@ -1346,6 +1353,81 @@ const feed_fetch: Fetcher = async (url) => {
   check("unload ends the process", llm.status.state, "unloaded");
 }
 
+// --- the safeguards around Gemma's GPU work, against the fake worker and the stub
+{
+  check("junk tokens are recognised", is_degenerate("Yes<unused50><unused50>"), true);
+  check("ordinary text is not junk", is_degenerate("A dog <b>photo</b> [1]."), false);
+
+  const lock = join(mkdtempSync(join(tmpdir(), "strata-lock-")), "gemma.lock");
+  const gone = Bun.spawnSync(["true"]).pid;
+  check("the GPU lock is free at first", claim_gemma_lock(lock, process.pid).ok, true);
+  check(
+    "a live holder keeps it",
+    JSON.stringify(claim_gemma_lock(lock, gone)),
+    JSON.stringify({ ok: false, holder: process.pid }),
+  );
+  release_gemma_lock(lock, process.pid);
+  claim_gemma_lock(lock, gone);
+  check("a dead holder's lock is taken over", claim_gemma_lock(lock, process.pid).ok, true);
+  release_gemma_lock(lock, process.pid);
+  check("and released", existsSync(lock), false);
+}
+{
+  const worker_path = fileURLToPath(new URL("./fake-llm-worker.ts", import.meta.url));
+  const llm = new LocalLlm({
+    worker_path,
+    models_dir: mkdtempSync(join(tmpdir(), "strata-gemma-")),
+    stall_ms: 300,
+  });
+  check(
+    "a long answer outlives the stall limit while the heartbeat comes",
+    (await llm.chat([{ role: "user", content: "__slow__" }])).startsWith("w0 "),
+  );
+  const code = await llm
+    .chat([{ role: "user", content: "__hang__" }])
+    .catch((e: Failure) => e.code);
+  check("a worker that goes silent is killed", code, "LLM_STOPPED");
+  check("and Gemma stays off", llm.available, false);
+  check("saying why", /stays off until Strata restarts/.test(llm.status.error ?? ""), true);
+  check(
+    "later requests are refused rather than loading it again",
+    await llm.chat([{ role: "user", content: "hi" }]).catch((e: Failure) => e.code),
+    "ML_UNAVAILABLE",
+  );
+}
+{
+  const llm = new LocalLlm({
+    worker_path: fileURLToPath(new URL("./fake-llm-worker.ts", import.meta.url)),
+    models_dir: mkdtempSync(join(tmpdir(), "strata-gemma-")),
+  });
+  check(
+    "junk output stops it too",
+    await llm.chat([{ role: "user", content: "__junk__" }]).catch((e: Failure) => e.code),
+    "LLM_STOPPED",
+  );
+  check("and keeps it off", llm.available, false);
+}
+{
+  // Five notes of ~1500 characters fill Gemma's 6000-character budget; a stub that refuses
+  // over 5000 makes Ask halve the budget and ask again with fewer sources.
+  const local = new LocalStub({ limit: 5000 });
+  const app = await create_app({
+    data_dir: mkdtempSync(join(tmpdir(), "strata-shrink-")),
+    ml: new MlStub(),
+    local,
+    fetch: fixture_fetch,
+  });
+  for (let i = 0; i < 5; i++) {
+    app.add_note({ body: `Compost note ${i}. ${"Turn the compost heap and keep it damp. ".repeat(38)}` });
+  }
+  await app.ingest.idle();
+  const answer = await app.ask("how should I turn the compost heap?");
+  check("a prompt too long for the model is asked again", local.calls.length, 2);
+  check("and answered", answer.answer, "Your notes cover this [1].");
+  check("with fewer sources", answer.sources.length < 4 && answer.sources.length > 0, true);
+  app.close();
+}
+
 // --- MlClient against the fake worker
 {
   const client = new MlClient({
@@ -1409,4 +1491,4 @@ if (recorder) {
   check("still idle after stop", rec.isRecording(), false);
 }
 
-finish("brain", recorder ? 261 : 256);
+finish("brain", recorder ? 277 : 272);

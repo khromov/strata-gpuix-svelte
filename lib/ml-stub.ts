@@ -151,10 +151,18 @@ export class LocalStub implements LocalLike {
 	on_status: (status: LocalStatus) => void;
 	/** Every message list `chat` was given, for tests. */
 	calls: Message[][] = [];
+	/** Prompts longer than this many characters are refused as TOO_LONG, like Gemma's token cap. */
+	limit: number;
 
-	constructor({ available = true, reason = null, on_status = () => {} }: { available?: boolean; reason?: string | null; on_status?: (s: LocalStatus) => void } = {}) {
+	constructor({
+		available = true,
+		reason = null,
+		limit = Infinity,
+		on_status = () => {}
+	}: { available?: boolean; reason?: string | null; limit?: number; on_status?: (s: LocalStatus) => void } = {}) {
 		this.available = available;
 		this.reason = reason;
+		this.limit = limit;
 		this.on_status = on_status;
 		this.status = { state: available ? 'ready' : 'error', progress: available ? 100 : null, error: reason, downloaded: available, rss: null };
 	}
@@ -166,6 +174,8 @@ export class LocalStub implements LocalLike {
 	async chat(messages: Message[], { onDelta, signal }: ChatOptions = {}): Promise<string> {
 		await this.load();
 		this.calls.push(messages);
+		const chars = messages.reduce((n, m) => n + (typeof m.content === 'string' ? m.content.length : 0), 0);
+		if (chars > this.limit) throw new MlError(`stub prompt of ${chars} characters is too long`, { code: 'TOO_LONG' });
 		const last = messages.at(-1)?.content ?? '';
 		const text =
 			typeof last !== 'string'

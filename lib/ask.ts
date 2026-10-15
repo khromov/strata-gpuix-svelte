@@ -1,8 +1,8 @@
-import { LlmError, type Message } from './llm.ts';
+import { LlmError, shrinking, type Message } from './llm.ts';
 import type { Llms } from './llms.ts';
 import { warn } from './log.ts';
 import { clip_snippet } from './rank.ts';
-import type { Search } from './search.ts';
+import type { ChunkHit, Search } from './search.ts';
 import type { Kind } from './store.ts';
 
 const SYSTEM = `You are Strata, a personal second brain. Answer the question using only the numbered sources from the user's own notes, links, images and recordings. Cite a source as [n] right after the fact it supports. If the sources do not contain the answer, say so plainly rather than guessing. Be concise; use markdown.`;
@@ -51,11 +51,12 @@ export async function ask(
 	const llm = llms.text();
 	if (!llm) throw new LlmError(llms.caps().llm.reason ?? 'no language model', { code: 'NOT_CONFIGURED' });
 
-	const sources: Source[] = [];
-	const texts: string[] = [];
-	let used = 0;
+	const hits = await search.search_chunks(question, { k });
+	const texts = new Map<ChunkHit, string>();
 	let described = 0;
-	for (const hit of await search.search_chunks(question, { k })) {
+	const text_of = async (hit: ChunkHit): Promise<string> => {
+		const known = texts.get(hit);
+		if (known !== undefined) return known;
 		let text = hit.chunk?.text ?? null;
 		// An image nobody described (imported before a vision model was set up) has no text for
 		// the model to read; describing it now also files that text for every later search.
@@ -67,32 +68,49 @@ export async function ask(
 			});
 			signal?.throwIfAborted();
 		}
-		text ||= UNDESCRIBED;
-		if (sources.length && used + text.length > max_chars) break;
-		used += text.length;
-		texts.push(text);
-		sources.push({
-			n: sources.length + 1,
-			item_id: hit.item.id,
-			chunk_id: hit.chunk?.id ?? null,
-			title: hit.item.title || 'Untitled',
-			kind: hit.item.kind,
-			snippet: clip_snippet(text, 160),
-			date: new Date(hit.item.created_at).toISOString().slice(0, 10)
-		});
-	}
+		texts.set(hit, text || UNDESCRIBED);
+		return text || UNDESCRIBED;
+	};
 
-	const context = sources.length
-		? `Sources:\n\n${sources.map((s, i) => `[${s.n}] ${s.title} (${s.kind}, ${s.date})\n${texts[i]}`).join('\n\n')}`
-		: 'Sources: nothing in the brain matched this question.';
-	const messages: Message[] = [
-		{ role: 'system', content: SYSTEM },
-		...history.slice(-6),
-		{ role: 'user', content: `${context}\n\nQuestion: ${question}` }
-	];
+	// Recent turns count against the budget too, newest first, up to a third of it.
+	const prompt = async (budget: number) => {
+		const recent: Message[] = [];
+		let used = 0;
+		for (const turn of history.slice(-6).reverse()) {
+			const n = typeof turn.content === 'string' ? turn.content.length : 0;
+			if (used + n > budget / 3) break;
+			used += n;
+			recent.unshift(turn);
+		}
+		const sources: Source[] = [];
+		const quoted: string[] = [];
+		for (const hit of hits) {
+			const text = await text_of(hit);
+			if (sources.length && used + text.length > budget) break;
+			used += text.length;
+			quoted.push(text);
+			sources.push({
+				n: sources.length + 1,
+				item_id: hit.item.id,
+				chunk_id: hit.chunk?.id ?? null,
+				title: hit.item.title || 'Untitled',
+				kind: hit.item.kind,
+				snippet: clip_snippet(text, 160),
+				date: new Date(hit.item.created_at).toISOString().slice(0, 10)
+			});
+		}
+		const context = sources.length
+			? `Sources:\n\n${sources.map((s, i) => `[${s.n}] ${s.title} (${s.kind}, ${s.date})\n${quoted[i]}`).join('\n\n')}`
+			: 'Sources: nothing in the brain matched this question.';
+		const messages: Message[] = [{ role: 'system', content: SYSTEM }, ...recent, { role: 'user', content: `${context}\n\nQuestion: ${question}` }];
+		return { messages, sources };
+	};
 
-	const answer = await llm.chat(messages, { stream: true, signal, onDelta: on_token });
-	return { answer, sources, cited: cited_sources(answer, sources.length) };
+	return shrinking(Math.min(max_chars, llm.prompt_chars), async (budget) => {
+		const { messages, sources } = await prompt(budget);
+		const answer = await llm.chat(messages, { stream: true, signal, onDelta: on_token });
+		return { answer, sources, cited: cited_sources(answer, sources.length) };
+	});
 }
 
 /** `[2]` and `[1, 3]` alike: small models, Gemma among them, tend to cite in lists. */

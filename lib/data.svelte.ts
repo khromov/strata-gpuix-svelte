@@ -139,6 +139,12 @@ export function bind_app(next: App) {
 			data.ml = { ...event.status };
 		} else if (event.type === 'llm') {
 			data.llm = { ...event.status };
+			// Gemma stopped for safety is off until a restart, which Ask has to know.
+			if (event.status.state === 'error') {
+				app!.capabilities().then((caps) => {
+					data.capabilities = caps;
+				});
+			}
 		} else if (event.type === 'settings' && event.key.startsWith('llm.')) {
 			data.provider = app!.settings.provider();
 			app!.capabilities().then((caps) => {

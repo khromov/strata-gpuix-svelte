@@ -40,6 +40,8 @@ export type ChatFn = (messages: Message[], opts?: ChatOptions) => Promise<string
 export interface Llm {
 	/** Recorded on what it wrote, as `described_by` and `summarized_by`. */
 	model: string;
+	/** Most characters of text one prompt carries (Ask's sources, a note to summarize). */
+	prompt_chars: number;
 	chat: ChatFn;
 	describe_image(bytes: Uint8Array, opts?: { prompt?: string; signal?: AbortSignal; background?: boolean }): Promise<string>;
 	summarize(text: string, opts?: { maxWords?: number; signal?: AbortSignal }): Promise<string>;
@@ -229,10 +231,27 @@ export function create_llm(config: LlmConfig) {
 	return { ...llm_tasks(config.model, chat), config: { ...config, baseUrl }, models, test };
 }
 
+/**
+ * Runs `attempt` with `chars` of text, halving it while the model answers TOO_LONG: the
+ * on-device model refuses an over-long prompt rather than put it on the GPU, and dense text
+ * (code, CJK) runs to more tokens per character than the budget assumes.
+ */
+export async function shrinking<T>(chars: number, attempt: (chars: number) => Promise<T>): Promise<T> {
+	for (;;) {
+		try {
+			return await attempt(chars);
+		} catch (err) {
+			if ((err as { code?: string }).code !== 'TOO_LONG' || chars < 1000) throw err;
+			chars = Math.floor(chars / 2);
+		}
+	}
+}
+
 /** The prompts Strata runs, over any chat function. */
-export function llm_tasks(model: string, chat: ChatFn): Llm {
+export function llm_tasks(model: string, chat: ChatFn, { prompt_chars = 24_000 }: { prompt_chars?: number } = {}): Llm {
 	return {
 		model,
+		prompt_chars,
 		chat,
 
 		async describe_image(bytes, { prompt = DESCRIBE_PROMPT, signal, background } = {}) {
@@ -245,22 +264,26 @@ export function llm_tasks(model: string, chat: ChatFn): Llm {
 		},
 
 		async summarize(text, { maxWords = 120, signal } = {}) {
-			return chat(
-				[
-					{ role: 'system', content: `Summarize the user's text in three to five bullet points, at most ${maxWords} words in total. Plain markdown, no preamble.` },
-					{ role: 'user', content: text.slice(0, 24_000) }
-				],
-				{ stream: false, signal }
+			return shrinking(prompt_chars, (chars) =>
+				chat(
+					[
+						{ role: 'system', content: `Summarize the user's text in three to five bullet points, at most ${maxWords} words in total. Plain markdown, no preamble.` },
+						{ role: 'user', content: text.slice(0, chars) }
+					],
+					{ stream: false, signal }
+				)
 			);
 		},
 
 		async suggest_title(text, { signal } = {}) {
-			const raw = await chat(
-				[
-					{ role: 'system', content: 'Reply with only a title for the text: at most eight words, no quotes, no trailing period.' },
-					{ role: 'user', content: text.slice(0, 6000) }
-				],
-				{ stream: false, signal, maxTokens: 32 }
+			const raw = await shrinking(Math.min(6000, prompt_chars), (chars) =>
+				chat(
+					[
+						{ role: 'system', content: 'Reply with only a title for the text: at most eight words, no quotes, no trailing period.' },
+						{ role: 'user', content: text.slice(0, chars) }
+					],
+					{ stream: false, signal, maxTokens: 32 }
+				)
 			);
 			return raw.split('\n')[0].replace(/^["'“”]+|["'“”.]+$/g, '').trim().slice(0, 80);
 		}

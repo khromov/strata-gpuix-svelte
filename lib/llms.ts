@@ -6,7 +6,7 @@
 
 import type { Cap } from './capabilities.ts';
 import { create_llm, llm_tasks, type Llm } from './llm.ts';
-import { GEMMA_NAME, type LocalLike } from './llm-local.ts';
+import { GEMMA_NAME, GEMMA_PROMPT_CHARS, type LocalLike } from './llm-local.ts';
 import type { Settings } from './settings.ts';
 
 export type Llms = ReturnType<typeof create_llms>;
@@ -14,7 +14,7 @@ export type Llms = ReturnType<typeof create_llms>;
 const NO_ENDPOINT = 'no LLM configured — set a base URL and model in Settings';
 
 export function create_llms({ settings, local }: { settings: Settings; local: LocalLike }) {
-	const gemma = llm_tasks(GEMMA_NAME, (messages, opts) => local.chat(messages, opts));
+	const gemma = llm_tasks(GEMMA_NAME, (messages, opts) => local.chat(messages, opts), { prompt_chars: GEMMA_PROMPT_CHARS });
 
 	const llms = {
 		/** Answers, summaries and titles. */

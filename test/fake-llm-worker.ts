@@ -1,8 +1,9 @@
 /**
  * Speaks ml/llm-worker.ts's protocol without a model, so LocalLlm's spawn, token
- * streaming, abort, crash and idle exit run for real. The last message decides:
- * `__slow__` streams fifty words, `__crash__` dies, `__idle__` answers then exits
- * cleanly as an idle worker does; anything else is echoed.
+ * streaming, abort, crash, idle exit and the safeguards run for real. The last message
+ * decides: `__slow__` streams fifty words, `__crash__` dies, `__idle__` answers then exits
+ * cleanly as an idle worker does, `__hang__` blocks its thread as a stuck GPU wait does
+ * (no more heartbeats), `__junk__` reports junk output; anything else is echoed.
  */
 
 import type { LlmJob, LlmMessage, LlmRequest } from "../lib/llm-local.ts";
@@ -24,6 +25,12 @@ async function chat(job: Extract<LlmJob, { type: "chat" }>) {
   const last = job.messages.at(-1)?.content;
   const prompt = typeof last === "string" ? last : "";
   if (prompt === "__crash__") process.exit(1);
+  if (prompt === "__hang__") for (;;);
+  if (prompt === "__junk__") {
+    throw Object.assign(new Error("Gemma 4 E4B started writing junk tokens"), {
+      code: "DEGENERATE",
+    });
+  }
   const slow = prompt === "__slow__";
   const words = slow
     ? Array.from({ length: 50 }, (_, i) => `w${i} `)
@@ -52,10 +59,16 @@ process.on("message", async (msg: LlmRequest) => {
     send({
       id: msg.id,
       ok: false,
-      error: { message: (err as Error).message, code: "INFERENCE", transient: false },
+      error: {
+        message: (err as Error).message,
+        code: (err as { code?: string }).code ?? "INFERENCE",
+        transient: false,
+      },
     });
   }
 });
 process.on("disconnect", () => process.exit(0));
+// The real worker's heartbeat, sped up to suit the tests' short stall limit.
+setInterval(() => send({ type: "mem", rss: 1 }), 50);
 
 send({ type: "hello", pid: process.pid });
