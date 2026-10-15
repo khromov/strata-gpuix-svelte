@@ -1,5 +1,6 @@
 import { LlmError, type Message } from './llm.ts';
 import type { Llms } from './llms.ts';
+import { warn } from './log.ts';
 import { clip_snippet } from './rank.ts';
 import type { Search } from './search.ts';
 import type { Kind } from './store.ts';
@@ -9,7 +10,8 @@ const SYSTEM = `You are Strata, a personal second brain. Answer the question usi
 export interface Source {
 	n: number;
 	item_id: number;
-	chunk_id: number;
+	/** Null for an image found by what it shows rather than by text. */
+	chunk_id: number | null;
 	title: string;
 	kind: Kind;
 	snippet: string;
@@ -30,8 +32,19 @@ export interface Answer {
 	cited: number[];
 }
 
+/** An image matched by what it shows is described before it is quoted, a few per question. */
+const DESCRIBE_PER_QUESTION = 3;
+const UNDESCRIBED = 'An image that matches the question by what it shows. It has no description yet.';
+
+export interface AskDeps {
+	search: Search;
+	llms: Llms;
+	/** Describes an image and files the description on the item (`app.describe_image`). */
+	describe?: (item_id: number) => Promise<string>;
+}
+
 export async function ask(
-	{ search, llms }: { search: Search; llms: Llms },
+	{ search, llms, describe }: AskDeps,
 	question: string,
 	{ k = 8, max_chars = 12_000, history = [], signal, on_token }: AskOptions = {}
 ): Promise<Answer> {
@@ -41,15 +54,27 @@ export async function ask(
 	const sources: Source[] = [];
 	const texts: string[] = [];
 	let used = 0;
+	let described = 0;
 	for (const hit of await search.search_chunks(question, { k })) {
-		const text = hit.chunk.text;
+		let text = hit.chunk?.text ?? null;
+		// An image nobody described (imported before a vision model was set up) has no text for
+		// the model to read; describing it now also files that text for every later search.
+		if (text === null && describe && llms.vision() && described < DESCRIBE_PER_QUESTION) {
+			described++;
+			text = await describe(hit.item.id).catch((err: Error) => {
+				warn(`describing image ${hit.item.id} for Ask failed:`, err.message);
+				return null;
+			});
+			signal?.throwIfAborted();
+		}
+		text ||= UNDESCRIBED;
 		if (sources.length && used + text.length > max_chars) break;
 		used += text.length;
 		texts.push(text);
 		sources.push({
 			n: sources.length + 1,
 			item_id: hit.item.id,
-			chunk_id: hit.chunk.id,
+			chunk_id: hit.chunk?.id ?? null,
 			title: hit.item.title || 'Untitled',
 			kind: hit.item.kind,
 			snippet: clip_snippet(text, 160),

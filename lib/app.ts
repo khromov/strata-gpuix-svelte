@@ -279,7 +279,7 @@ export async function create_app({ data_dir = null, ml = null, local = null, fet
 		list: (opts?: ListOptions) => store.list_items(opts),
 		search: (query: string, opts?: SearchOptions) => search.search(query, opts),
 		related: (id: number, opts?: { limit?: number }) => search.related(id, opts),
-		ask: (question: string, opts?: AskOptions) => ask_llm({ search, llms }, question, opts),
+		ask: (question: string, opts?: AskOptions) => ask_llm({ search, llms, describe: (id) => app.describe_image(id) }, question, opts),
 		retry: (id: number) => ingest.retry(id),
 
 		/** Fetches a link again: body, title (when never edited) and preview image are replaced. */

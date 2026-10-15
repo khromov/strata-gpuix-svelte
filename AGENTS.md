@@ -132,8 +132,7 @@ Whisper/CLIP, and the worker's orphan watchdog.
 (huggingface/transformers.js#1672), so the worker ships as source with its `node_modules` in
 `Contents/Resources` and the app runs it on its own embedded Bun (`BUN_BE_BUN=1`). onnxruntime-node
 ships every platform's prebuilt runtime, so the copy is pruned to the host's. The compiled app keeps
-its data in `~/Library/Application Support/Strata` (`lib/paths.ts` moves a `Substrate` folder and
-a `substrate.sqlite` there from before the rename). `CODESIGN_IDENTITY` signs with the hardened
+its data in `~/Library/Application Support/Strata`. `CODESIGN_IDENTITY` signs with the hardened
 runtime and `NOTARY_PROFILE` then notarizes and staples (`xcrun notarytool store-credentials
 <profile>` once). `standalone.ts` mounts `App.svelte` with `render` and a static import, since a
 binary has no source to hot-reload; keep its window options in step with `app.ts` (both read

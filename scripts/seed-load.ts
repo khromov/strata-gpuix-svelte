@@ -32,14 +32,14 @@ const count = Number(args.find((a) => /^\d+$/.test(a))) || 5000;
 const fresh = args.includes('--fresh');
 
 const { Database } = await import('bun:sqlite');
-const { database_path, default_root } = await import('../lib/paths.ts');
+const { default_root } = await import('../lib/paths.ts');
 const real = default_root();
 const dir = resolve(flag('--dir') ?? join(real, 'load'));
 if (dir === resolve(real)) {
 	console.error('[seed-load] refusing to write into the real brain; pass another --dir');
 	process.exit(1);
 }
-const db_path = database_path(dir);
+const db_path = join(dir, 'strata.sqlite');
 // Beside the real brain rather than in the load one, so `--fresh`, another `--dir` or a
 // deleted load brain all reuse what was downloaded.
 const corpus = join(real, 'seed-corpus');
@@ -48,10 +48,9 @@ if (fresh) {
 	for (const suffix of ['', '-wal', '-shm']) rmSync(`${db_path}${suffix}`, { force: true });
 	rmSync(join(dir, 'cache'), { recursive: true, force: true });
 }
-const real_db = database_path(real);
-if (!existsSync(db_path) && existsSync(real_db)) {
+if (!existsSync(db_path) && existsSync(join(real, 'strata.sqlite'))) {
 	// VACUUM INTO reads through the WAL, so the copy is consistent even while the app is open.
-	new Database(real_db, { readonly: true }).run('VACUUM INTO ?', [db_path]);
+	new Database(join(real, 'strata.sqlite'), { readonly: true }).run('VACUUM INTO ?', [db_path]);
 	console.log(`[seed-load] copied ${real} into ${dir}`);
 }
 if (!existsSync(join(dir, 'models'))) symlinkSync(join(real, 'models'), join(dir, 'models'));

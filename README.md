@@ -151,8 +151,7 @@ and it never needs to be: the worker ships as source with its `node_modules` in
 `Contents/Resources/ml`, and the app launches it on its **own embedded Bun** by setting
 `BUN_BE_BUN=1`, which makes a compiled Bun executable behave as the plain `bun` CLI. The
 recorder shim is compiled at build time into `Contents/Resources/native`. Data lives in
-`~/Library/Application Support/Strata`, where `lib/paths.ts` moves a `Substrate` folder from
-before the rename. `CODESIGN_IDENTITY` and `NOTARY_PROFILE` sign
+`~/Library/Application Support/Strata`. `CODESIGN_IDENTITY` and `NOTARY_PROFILE` sign
 (nested addons first, then the executable, then the bundle) and notarize, as gpuix-svelte's
 [shipping guide](https://github.com/khromov/gpuix-svelte/blob/main/docs/shipping.md) describes.
 The bundle is ~250 MB, most of it onnxruntime and sharp prebuilds.

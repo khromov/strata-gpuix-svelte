@@ -1259,6 +1259,21 @@ const feed_fetch: Fetcher = async (url) => {
   app.settings.set("llm.provider", "local");
   check("an explicit choice wins", app.settings.provider(), "local");
   check("and gemma answers again", app.llms.text()?.model, GEMMA_NAME);
+
+  // An image imported while nothing could describe it is still found by what it shows, and
+  // described on the spot. MlStub's CLIP hashes file names, so the name is the question.
+  local.available = false;
+  const photo = await app.add_image(icon);
+  await app.ingest.idle();
+  local.available = true;
+  check("imported with no vision model, an image has no text", app.get_item(photo.id)!.body, "");
+  const looking = await app.ask(basename(app.blobs.file(photo.file_blob)!));
+  check("ask finds it by what it shows", looking.sources[0]?.item_id, photo.id);
+  check(
+    "and has it described before quoting it",
+    app.get_item(photo.id)!.body,
+    "A stub description of the picture.",
+  );
   app.close();
 }
 {
@@ -1394,4 +1409,4 @@ if (recorder) {
   check("still idle after stop", rec.isRecording(), false);
 }
 
-finish("brain", recorder ? 258 : 253);
+finish("brain", recorder ? 261 : 256);
