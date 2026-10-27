@@ -10,7 +10,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [macos-14, windows-latest]
+        os: [macos-14, ubuntu-latest, windows-latest]
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
@@ -19,6 +19,11 @@ jobs:
         with:
           node-version: 26
       - uses: oven-sh/setup-bun@v2
+      # The Linux prebuild of @gpuix/native links gpui's X11 client, and a runner has no
+      # desktop libs. test/smoke.ts skips itself there (no headless renderer), so Linux
+      # runs the typecheck and test/brain.ts.
+      - if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y libxcb1 libxkbcommon0 libxkbcommon-x11-0
       - run: bun install --frozen-lockfile
       - run: bun run typecheck
       - run: bun run test
