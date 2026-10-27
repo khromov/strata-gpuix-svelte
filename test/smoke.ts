@@ -9,6 +9,13 @@ if (!process.versions.bun) {
 	process.exit(1);
 }
 
+// The Linux prebuild of @gpuix/native ships without the headless renderer, so there is nothing to mount.
+const { hasTestGpuixRenderer } = await import('@gpuix/native');
+if (typeof hasTestGpuixRenderer === 'function' && !hasTestGpuixRenderer()) {
+	console.log('[smoke] skipped: this @gpuix/native build has no headless renderer (Linux prebuild)');
+	process.exit(0);
+}
+
 process.env.GPUIX_BRAIN_THEME = 'dark';
 
 import { existsSync, mkdtempSync } from 'node:fs';
@@ -125,7 +132,7 @@ const [cx, cy] = [card.x + 40, card.y + 20];
 click_at(cx, cy, { button: 2 });
 await wait();
 // The event's window coordinates and the <Portal>'s are the same space, or the menu misses the cursor.
-// getElementBounds reports the content box, so the panel's 1px border and 6px padding are the whole gap.
+// getElementBounds reports the border box, so the panel's border and padding are inside it.
 const box = native.getElementBounds(find_test_id('menu')!.id)!;
 check('the menu opens at the cursor', box.x - cx === 7 && box.y - cy === 7, true);
 check('right-clicking a card opens its menu', painted().includes('Copy text'));
@@ -211,7 +218,7 @@ await wait();
 check('scrolling to the end paints the last block', painted().includes('Paragraph 149 of the long page.'));
 await tap('Strata');
 
-// Tab reaches keydown as an ordinary key; App walks the window's fields with focus_next().
+// Tab moves focus between the window's fields natively.
 const search_input = find((n) => n.type === 'input');
 focus(search_input!);
 press('tab');

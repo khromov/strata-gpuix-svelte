@@ -3,7 +3,7 @@
 	import Portal from 'gpuix-svelte/components/Portal.svelte';
 	import SearchSuggest from './SearchSuggest.svelte';
 	import { push, replace, route } from '../lib/router.svelte.ts';
-	import { focus, register, spend_tab, ui } from '../lib/ui.svelte.ts';
+	import { focus, register, ui } from '../lib/ui.svelte.ts';
 	import Icon from './Icon.svelte';
 	import IconButton from './IconButton.svelte';
 
@@ -101,7 +101,8 @@
 		if (e.key === 'down') s.active = (s.active + 1) % s.items.length;
 		else if (e.key === 'up') s.active = (s.active - 1 + s.items.length) % s.items.length;
 		else if (e.key === 'tab') {
-			spend_tab();
+			// Tab moves focus on its own unless the handler claims it.
+			e.preventDefault();
 			s.items[s.active]?.apply();
 		}
 	}
