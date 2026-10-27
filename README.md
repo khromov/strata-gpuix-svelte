@@ -1,5 +1,7 @@
 # Strata — a second brain on GPUI
 
+![Strata, a second brain in a native GPUI window](docs/screenshot.png)
+
 A personal knowledge app rendered by Svelte into a native GPUI window. Pour anything in —
 text, links, images, voice recordings — and all of it becomes searchable by meaning, by keyword
 and by what is in the picture. A language model can then answer questions over it, citing the
