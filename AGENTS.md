@@ -4,7 +4,8 @@ Strata is a "second brain" desktop app: notes, links, images and voice memos, hy
 and RAG chat. It is a gpuix-svelte app: Svelte 5 components rendered into a native desktop window
 by GPUI, the GPU-accelerated UI framework behind the Zed editor. It moved here from gpuix-svelte's
 `examples/second-brain` (that repository's history has everything before the move), on top of a
-`bun create gpuix-svelte` scaffold. README.md covers what the app does and how it is laid out.
+`bun create gpuix-svelte` scaffold. README.md covers what the app does; docs/internals.md covers how it is laid out
+and the decisions behind it.
 
 ## Documentation
 

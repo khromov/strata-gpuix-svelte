@@ -1,178 +1,110 @@
-# Strata — a second brain on GPUI
+# Strata
 
-![Strata, a second brain in a native GPUI window](docs/screenshot.png)
+![Strata, a second brain in a native desktop window](docs/screenshot.png)
 
-A personal knowledge app rendered by Svelte into a native GPUI window. Pour anything in —
-text, links, images, voice recordings — and all of it becomes searchable by meaning, by keyword
-and by what is in the picture. A language model can then answer questions over it, citing the
-items it used: Gemma 4 E4B on your own GPU by default, or any OpenAI-compatible endpoint.
+Strata is a second brain that lives on your computer. Drop in anything you want to keep:
+notes, links, images, voice memos, RSS feeds. All of it becomes searchable by meaning, by
+keyword and by what is in a picture. Then ask questions about what you have saved, and Strata
+answers with citations back to the items it used.
 
-It is built on [gpuix-svelte](https://github.com/khromov/gpuix-svelte), the Svelte custom
-renderer for GPUI, and started life as one of its examples; this repository began as
-`bun create gpuix-svelte`.
+Everything runs locally. Search, transcription and image understanding use small models on your
+own machine. The model that answers your questions is Gemma 4 E4B on your GPU by default, or any
+OpenAI-compatible endpoint you point it at, such as Ollama, LM Studio or OpenAI.
 
-**Bun only.** It leans on `bun:sqlite`, `Bun.spawn` with IPC, `Bun.Image`, `HTMLRewriter` and
-`bun:ffi`, none of which have Node twins, so every script runs on Bun (`gpuix-svelte --bun`).
+Strata is a real native app, not a web view. It is written in Svelte and drawn by GPUI, the
+GPU-accelerated UI framework behind the Zed editor, through
+[gpuix-svelte](https://github.com/khromov/gpuix-svelte). It started life as one of
+gpuix-svelte's examples.
+
+## Getting started
+
+You need [Bun](https://bun.sh) 1.4.3 or newer. Strata relies on Bun's built-in SQLite, image,
+HTML and FFI APIs, so it does not run on Node.
 
 ```bash
-bun install             # the app's dependencies, gpuix-svelte and its Svelte build included
-bun run ml:install      # once: the ML dependencies (transformers.js + onnxruntime + sharp) into ml/
-bun run ml:doctor       # optional: proves the models run under Bun, downloads them (~380 MB)
-bun run start           # opens Strata; saving a .svelte file hot-reloads it
-bun run start:wayland   # Linux: force a Wayland window
-bun run start:x11       # Linux: force an X11 window
-bun run test            # test/brain.ts (data + native, no models) and test/smoke.ts (headless UI)
-bun run typecheck       # tsc, then svelte-check against GPUI's element types
-bun run build           # dist/Strata.app, models and all (macOS)
-bun run import-hn       # pours today's Hacker News front page in
-bun run seed-load       # a 5000-item load-test brain in .data/load, beside the real one
-bun run frames          # GPUI draw times per route, against a copy of the data
+git clone https://github.com/khromov/strata-gpuix-svelte
+cd strata-gpuix-svelte
+bun install
+bun run ml:install   # once: the on-device model dependencies, about 380 MB
+bun run start
 ```
 
-The first launch downloads three models into `.data/models` and shows progress in the status
-pill; keyword search works while that happens. Without `ml:install` the app still opens and
-keyword search still works — the Models panel says what to run.
+The first launch downloads three small models (about 380 MB) into `.data/models` and shows
+progress in the status pill. You can start adding things right away, and keyword search works
+while the download runs. If you skip `ml:install`, Strata still opens and keyword search still
+works. The Models panel in Settings tells you what to run.
 
-## What it does
+On Linux, `bun run start:wayland` or `bun run start:x11` picks the window system by hand.
 
-- **Capture**: a note (Enter saves, Shift+Enter is a newline), a URL (scraped to readable text with
-  its title and preview image), images via the file chooser or straight from the clipboard,
-  audio via the microphone (macOS and Windows) or an imported WAV or MP3.
-- **On-device models**, all through [transformers.js](https://huggingface.co/docs/transformers.js)
-  in a child Bun process: `nomic-ai/nomic-embed-text-v1.5` for text embeddings (768-d, 8k-token
-  context), `onnx-community/whisper-base` for transcription, `Xenova/clip-vit-base-patch32` so a
-  text query finds images by their content.
-- **Hybrid search**: semantic (cosine over the chunk embeddings), keyword (SQLite FTS5 with
-  `bm25()`) and CLIP image hits, fused with reciprocal rank fusion. Each result shows which
-  signals found it — an image the picture itself matched carries a "visual match" badge — with
-  the query terms highlighted in a window around the first match. `kind:note`, `kind:link`,
-  `kind:image` and `kind:audio` narrow a query or, alone, list a kind; the search box completes
-  them as you type (arrows choose, Tab completes, Enter searches). A pasted URL finds its item.
-  Every item also gets a "Related" list from its stored vectors.
-- **Feeds**: subscribe to an RSS or Atom address (or a blog's homepage — the `<link rel="alternate">`
-  it advertises is followed) and its entries are ingested like any link you save. Each feed has its
-  own check interval — hourly, every 4 or 12 hours, or daily (croner under the hood) — a
-  **full article** switch — off, only what the document
-  itself carries is stored and no page is fetched per entry — and optional retention (keep the
-  newest *n*, or *n* days; anything you have edited is never pruned). A missed poll is caught up
-  shortly after launch. Because a feed brings in far more than you do, one *Include feeds* switch
-  decides whether its entries are part of the timeline, search, Ask and Related, or out of all of
-  them — it is on by default, the same switch appears on the timeline, beside the search page's kind
-  filters and in Settings, and it is remembered. A single query overrides it with `feeds:on`. An entry whose URL you had already saved is adopted rather
-  than duplicated, and an entry you delete is never fetched again.
-- **Ask**: retrieval-augmented chat over the corpus. Answers stream in as markdown; `[n]` citations
-  (and lists like `[1, 3]`) light up the chips that open the item. Settings → Language model picks
-  who answers:
-  - **On this computer** (the default): Gemma 4 E4B (`onnx-community/gemma-4-E4B-it-ONNX`, q4f16)
-    through transformers.js on WebGPU, which is Metal on macOS, in a child process of its own
-    (`ml/llm-worker.ts`). The first question, summary or imported image downloads it (~5.2 GB, with
-    progress in the chat and the status pill); loaded it takes about 6 GB, and the process exits after
-    ten idle minutes. It reads images too, so every imported image is described.
-  - **OpenAI-compatible endpoint**: Ollama, LM Studio, OpenAI, OpenRouter. A vision model, when
-    configured, describes images on import.
+## What you can do
 
-  An endpoint configured before the choice existed (or through `GPUIX_BRAIN_LLM_URL`) keeps being
-  used until you pick.
-- **Right-click anything**: an item, a feed, a sidebar entry, an answer, a citation, or empty space.
-  Each offers what applies to it — a failed link gets *Retry* and *Re-read page*, an audio item gets
-  *Play*, empty space gets the capture actions — with the arrow keys and Enter working through it and
-  a confirmation in front of anything destructive. On macOS ctrl+click opens the same menu on
-  anything that was already clickable — GPUI routes it to `click`, not `auxClick`, so only a
-  surface with a primary handler can see it.
-- **Light and dark**, following the system or fixed, with the palette in `lib/theme.ts`.
-- **Settings → Pipeline** shows what is being scraped, transcribed and embedded right now, with
-  requeue and retry buttons; **Settings → On-device models** shows each model's state, download
-  progress and the worker's memory.
+**Capture anything.** Type a note (Enter saves, Shift+Enter adds a line). Paste a URL and Strata
+fetches the page, keeps the readable text, and saves the title and preview image. Add images from
+the file chooser or straight from the clipboard. Record a voice memo with the microphone (macOS
+and Windows), or import a WAV or MP3. Audio is transcribed and images are described, so both turn
+up in search.
 
-## Where things live
+**Search three ways at once.** One search box matches by meaning, by keyword and by what is in an
+image. Each result shows which of those found it, and an image found by its content gets a
+"visual match" badge. Type `kind:note`, `kind:link`, `kind:image` or `kind:audio` to narrow a
+search, with completions as you type. Paste a URL to jump to its item. Every item also has a
+Related list.
 
-```
-  app.ts                 Bun guard → create_app() → render_hot(App.svelte, { props: { app } })
-  standalone.ts          the compiled entry: static imports, render() instead of render_hot()
-  build.ts               standalone.ts → dist/strata → dist/Strata.app (bun run build)
-  App.svelte             root layout, window-level shortcuts, the palette → set_css_vars, route table
-  RouteView.svelte       resolves the route and lazy-loads the page component
-  routes/                Everything, Kind, Search, Item, Ask, Feeds, Settings, NotFound; Item renders a
-                         page one <markdown> block per virtual row (lib/blocks.ts), since a native
-                         markdown element lays out its whole document every frame
-  components/            Sidebar, ItemCard, CaptureBox, Field, …; Modal is a <Portal> rendered from
-                         whoever needs a dialog, ContextMenu one mounted once by App; scrolling
-                         is the package's Scroller
-  lib/                   the data layer (plain TS) and the UI state (.svelte.ts runes modules);
-                         menus.ts is what each right click offers
-  lib/feeds/             the poller (poll.ts, croner) over a source registry; rss.ts reads RSS 2.0,
-                         RDF and Atom, and another kind is a module plus an entry in SOURCES
-  ml/worker.ts           the child process that owns the models; ml/doctor.ts is the spike
-  ml/llm-worker.ts       Gemma's own child process, started on demand (client: lib/llm-local.ts;
-                         lib/llms.ts picks Gemma or the endpoint per request)
-  native/recorder-shim.m AVAudioRecorder over bun:ffi, compiled by clang on first use (macOS);
-                         lib/recorder-win.ts and lib/player-win.ts are the winmm equivalents,
-                         over the shared FFI surface in lib/winmm.ts
-  scripts/import-hn.ts   the Hacker News importer; frame-cost.ts prints GPUI draw times per route
-                         (bun run frames), against a copy of the data; seed-load.ts fills a
-                         load-test brain from Wikipedia, picsum.photos and `say`
-  test/                  brain.ts (data + native, no models) and smoke.ts (headless UI)
-  icon.svg / icon.png    the logo; the .app's icon is cut from the PNG
-  .data/                 gitignored: strata.sqlite, cache/, models/, tmp/
+**Follow feeds.** Subscribe to an RSS or Atom feed, or just a blog's homepage, and new entries are
+saved like any other link. Each feed has its own check interval, a switch for fetching the full
+article, and optional retention rules. Anything you have edited is never pruned. Because feeds
+bring in far more than you do, one "Include feeds" switch decides whether their entries show up
+in the timeline, search, Ask and Related. It is on by default, appears wherever it matters, and
+`feeds:on` in a query overrides it once.
+
+**Ask.** Ask a question and Strata answers from what you have saved, streaming the reply as
+markdown with numbered citations. Click a citation to open the item. Settings → Language model
+chooses who answers:
+
+- **On this computer** (the default). Gemma 4 E4B through transformers.js on WebGPU. The first
+  question downloads it (about 5.2 GB, with progress shown in the chat and the status pill). It
+  uses about 6 GB of memory while loaded and shuts itself down after ten idle minutes. It also
+  reads images, so every imported image gets a description.
+- **An OpenAI-compatible endpoint.** Ollama, LM Studio, OpenAI, OpenRouter and the like. If the
+  model can see images, it describes them on import.
+
+**Right-click anything.** Items, feeds, sidebar entries, answers, citations and empty space each
+have a menu with the actions that apply to them. The arrow keys and Enter work through it, and
+anything destructive asks first.
+
+**Light and dark.** Follows your system, or fix it in Settings.
+
+**See what is happening.** Settings → Pipeline shows what is being scraped, transcribed and
+embedded right now, with retry buttons. Settings → On-device models shows each model's state,
+download progress and memory use.
+
+## Your data
+
+Everything lives in one file, `strata.sqlite`, inside the `.data` directory (or
+`~/Library/Application Support/Strata` for the built macOS app). Images, thumbnails and
+recordings are stored inside it, so copying that one file copies your whole brain. The `cache`
+directory beside it is disposable and rebuilds itself.
+
+An API key entered in Settings is stored in plain text in that file. Set `GPUIX_BRAIN_LLM_KEY`
+instead if you would rather it never touches disk.
+
+## Building the macOS app
+
+```bash
+bun run build   # dist/Strata.app, models and all
 ```
 
-**`strata.sqlite` is the whole brain.** Images, thumbnails and recordings are rows in a
-`blobs` table, not files beside the database, so copying that one file moves everything —
-which is also why `bun run frames` can point a window at a `VACUUM INTO` copy and still
-paint. GPUI's `<img src>`, `afplay` and the worker all want a real path, so `lib/blobs.ts`
-writes a blob into `cache/` the first time one is asked for. That directory is disposable:
-delete it and it fills in again. Blob rows are immutable — replacing an item's media inserts a
-new row — so a cache file named after a blob id can never be stale.
+Set `CODESIGN_IDENTITY` and `NOTARY_PROFILE` to sign and notarize it. The bundle is about
+250 MB. [docs/internals.md](docs/internals.md#the-macos-app) explains how it is put together.
 
-The UI process is the only SQLite writer and holds the vector indexes in memory (`lib/vectors.ts`
-is the seam to swap for PGlite + pgvector should a corpus ever outgrow a brute-force scan). The
-worker is stateless: it gets texts or cache paths over IPC and returns `Float32Array`s — typed
-arrays cross Bun IPC as-is. Every item goes `pending → processing → ready | error`; the steps
-are derived from the row's state, so a restart resumes where it stopped instead of replaying an
-hour of Whisper. Jobs another process left unfinished are requeued after ten minutes (or from
-Settings at once).
+## Configuration
 
-### Memory
-
-Three ONNX models are about 1 GB resident. What made a worker balloon past 6 GB on a 16 GB
-machine was attention memory on very long chunks (a minified script is one "word") kept alive
-by ONNX Runtime's arena. The safeguards: chunk size is capped by characters as well as words,
-embedding batches are eight chunks, the arena is off, Whisper and CLIP unload after five idle
-minutes, a worker whose parent died exits on its own, and Settings shows the worker's and the
-app's resident size. Run one model-loading process at a time.
-
-Gemma is the big one: about 6 GB resident while loaded (8 GB after a long prompt), in a process
-that only exists between the first request and ten idle minutes later. Exiting is the unload,
-since it is the one way to be sure WebGPU's buffers go back.
-
-A GPU job that never finishes cannot be cancelled, and can freeze the whole machine, so Gemma
-runs fenced in: prompts stay under 3072 tokens, a generation stops at the first junk token or
-after three minutes, a worker that stops answering for a minute is killed, only one process may
-run Gemma at a time, and after any of that it stays off until Strata restarts.
-
-## The macOS app
-
-`bun run build` runs `build.ts`: `Bun.build({ compile })` over
-`standalone.ts` gives `dist/strata`, then `dist/Strata.app` is assembled around it.
-transformers.js cannot be compiled into a Bun binary (onnxruntime's dylib and sharp's addon are
-not embedded — [huggingface/transformers.js#1672](https://github.com/huggingface/transformers.js/issues/1672)),
-and it never needs to be: the worker ships as source with its `node_modules` in
-`Contents/Resources/ml`, and the app launches it on its **own embedded Bun** by setting
-`BUN_BE_BUN=1`, which makes a compiled Bun executable behave as the plain `bun` CLI. The
-recorder shim is compiled at build time into `Contents/Resources/native`. Data lives in
-`~/Library/Application Support/Strata`. `CODESIGN_IDENTITY` and `NOTARY_PROFILE` sign
-(nested addons first, then the executable, then the bundle) and notarize, as gpuix-svelte's
-[shipping guide](https://github.com/khromov/gpuix-svelte/blob/main/docs/shipping.md) describes.
-The bundle is ~250 MB, most of it onnxruntime and sharp prebuilds.
-
-## Environment
-
-All optional, all `GPUIX_BRAIN_*`:
+All optional, all prefixed `GPUIX_BRAIN_`:
 
 | Variable | Effect |
 |---|---|
 | `DIR` | data directory (default `.data`, or the app data directory when compiled) |
-| `STUB=1` | seeded fake data and a stub worker — no models; used for screenshots and tests |
+| `STUB=1` | seeded fake data and a stub worker, no models; used for screenshots and tests |
 | `START=/settings` | initial route |
 | `THEME=light\|dark` | ignore the stored theme and the system setting |
 | `ML=off` | disable the ML worker entirely |
@@ -185,68 +117,21 @@ All optional, all `GPUIX_BRAIN_*`:
 | `RESOURCES=/path` | where a compiled app's worker and shim live (auto-detected inside a .app) |
 | `DEBUG=1` | verbose logging |
 
-`GPUIX_SCREENSHOT=/tmp/x.png` and `GPUIX_FPS=1` (GPUI's draw-time overlay) work as everywhere else. The API key lives in plain text in
-`strata.sqlite` when set through Settings; use `GPUIX_BRAIN_LLM_KEY` to keep it out.
+`GPUIX_SCREENSHOT=/tmp/x.png` and `GPUIX_FPS=1` (GPUI's draw-time overlay) work as in any
+gpuix-svelte app.
 
-## Things GPUI has no API for, and what stands in
+## For developers
 
-| Need | Stand-in |
-|---|---|
-| microphone | two backends behind one interface (`lib/recorder.ts`), both writing 16 kHz mono WAV over `bun:ffi`. macOS: `native/recorder-shim.m`, AVAudioRecorder, compiled by clang on first use. Windows: `lib/recorder-win.ts`, winmm's waveIn with WAVE_MAPPER converting to that format for us — a flat C ABI, so there is nothing to compile. Permission belongs to the process that asks, which from a checkout is your terminal on macOS and `bun.exe` on Windows; the .app asks in its own name |
-| file picker | `osascript … choose file` (macOS and Linux; on Windows you type a path) |
-| clipboard | `pbpaste`/`pbcopy` on macOS and `Get-Clipboard`/`Set-Clipboard` on Windows for text, `Bun.Image.fromClipboard()` for images |
-| audio playback | `afplay` on macOS, `paplay`/`ffplay`/`aplay` on Linux; on Windows the clip is decoded in-process and pushed to winmm's waveOut (`lib/player-win.ts`), since nothing ships with Windows that plays an MP3 from a command line without opening a window |
-| system dark mode | `defaults read -g AppleInterfaceStyle` on macOS, `gsettings` on Linux, a `reg query` on Windows; polled every 3 s |
-| decoding audio | a hand-written WAV parser (`lib/wav.ts`) and mpg123 as WebAssembly for MP3 (`lib/mp3.ts`). WAV and MP3 are the two formats Strata imports, and both are handled in-process — there is no ffmpeg to install |
-| readable text from a page | one synchronous `HTMLRewriter` pass (`lib/scrape.ts`) that scores candidate containers. lol-html keeps one `onEndTag` callback per element and the element handle is dead inside it — `scrape.ts` shows the way around |
-| AVIF / HEIC on screen | GPUI's image crate cannot decode them; `Bun.Image` (ImageIO) stores a WebP display copy beside the original |
-| shrinking a recording | LAME as WebAssembly (`wasm-media-encoders`, `lib/mp3.ts`): once the transcript exists, a memo the app recorded itself is re-encoded from 16 kHz PCM to 32 kbps MP3 in place, about eight times smaller, and mpg123 decodes it back if it is ever re-transcribed. An imported file is the user's master and is never rewritten |
-| search-hit highlighting | GPUI's native `highlight={{ ranges }}` prop, unlocked in gpuix-svelte's renderer for this app, with the ranges from gpuix-svelte's `find_ranges` (native's own matcher, one call per query term) |
-| reading a feed | a small XML scanner (`lib/feeds/xml.ts`) rather than `HTMLRewriter`, which is an HTML parser: it voids `<link/>`, lowercases and reshapes the tree, so Atom's `<link href>` and `<content type="html">` do not survive it. The HTML *inside* an entry does go through `extract()` |
-
-## About client-side routers
-
-Strata hand-rolls its router (`lib/router.svelte.ts`, ~60 lines: a `$state` route, a back
-stack, `:param` matching, lazy `import()`). Eight popular Svelte routers were evaluated first;
-only **svelte-spa-router 5** compiles under the custom renderer and can run here, and only with
-a fake `window`/`history` on `globalThis` plus `--conditions svelte` on the run script, since its
-`exports` map has nothing but a `svelte` key. The others fail at compile time on `in:` transitions
-(`svelte5-router`, `@dvcol/svelte-simple-router`), on Svelte 4 syntax (`svelte-routing`), or need
-a browser-sized shim (`sv-router`, `@mateothegreat/svelte5-router`). If you want svelte-spa-router,
-this shim, imported before the router, is all it takes:
-
-```js
-const listeners = new Map();
-let href = 'app:///#/';
-globalThis.history = {
-	state: null, scrollRestoration: 'auto',
-	pushState(s, _t, url) { this.state = s; if (url) href = url; },
-	replaceState(s, _t, url) { this.state = s; if (url) href = url; },
-	back() {}
-};
-globalThis.window = {
-	history: globalThis.history, scrollX: 0, scrollY: 0, scrollTo() {},
-	location: {
-		get href() { return href; },
-		get hash() { const i = href.indexOf('#'); return i === -1 ? '' : href.slice(i); },
-		set hash(v) { href = 'app:///' + (v.startsWith('#') ? v : '#' + v); globalThis.window.dispatchEvent(new Event('hashchange')); }
-	},
-	addEventListener(type, fn) { (listeners.get(type) ?? listeners.set(type, []).get(type)).push(fn); },
-	removeEventListener(type, fn) { const a = listeners.get(type); if (a) a.splice(a.indexOf(fn), 1); },
-	dispatchEvent(ev) { for (const fn of listeners.get(ev.type) ?? []) fn(ev); return true; }
-};
+```bash
+bun run test        # data and native tests, then a headless UI smoke test; no models, no network
+bun run typecheck   # tsc, then svelte-check against GPUI's element types
+bun run ml:doctor   # loads each model under Bun and runs one inference
+bun run import-hn   # pours today's Hacker News front page in
+bun run seed-load   # a 5000-item load-test brain in .data/load, beside the real one
+bun run frames      # GPUI draw times per route, against a copy of the data
 ```
 
-Strata does not, because a desktop app wants a back stack rather than hash URLs, and a fake
-`window` in a process whose whole point is "no DOM" is a trap for the next dependency that sniffs
-for one.
-
-## Tests
-
-`bun run test` runs `test/brain.ts` — the WAV codec,
-the page extractor, the SSE parser, the chunker, the vector index, the store and pipeline with a
-stub worker, the feed parser and poller against fixture documents, the Windows microphone consent
-parser, and the real IPC client against a fake worker, including a forced crash — and
-`test/smoke.ts`, which mounts the app headlessly and
-captures, opens, and deletes a note through GPUI's real hit testing. Neither needs a model or the
-network.
+[docs/internals.md](docs/internals.md) covers how the code is laid out, how the data and model
+processes fit together, the memory safeguards, what stands in for the APIs GPUI does not have
+(microphone, clipboard, file picker, audio playback), and why Strata has its own router.
+[AGENTS.md](AGENTS.md) is the guide for contributors and coding agents.
