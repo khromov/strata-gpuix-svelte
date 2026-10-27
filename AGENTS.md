@@ -18,7 +18,8 @@ bun install          # gpuix-svelte brings its own Svelte build
 bun run ml:install   # once: the ML deps (transformers.js → onnxruntime-node, sharp; ~380 MB of
                      # prebuilds) live in the nested ml/ package so the root stays lean
 bun run start        # opens the window; saving a .svelte file hot-reloads it
-bun run start:wayland   # Linux only: force Wayland (start:x11 forces X11)
+bun run start:wayland   # Linux only: force a Wayland window
+bun run start:x11       # Linux only: force an X11 window
 bun run test         # test/brain.ts, then test/smoke.ts; no models, no network
 bun run typecheck    # tsc, then svelte-check against GPUI's element types
 bun run ml:doctor    # loads all three models under Bun and runs one inference each; the first
@@ -73,10 +74,10 @@ fake data and a stub worker — screenshots), `START=/settings`, `THEME=light|da
 - Right-click menus on every surface: `components/ContextMenu.svelte` draws them, `lib/menus.ts`
   says what is in them. GPUI routes macOS's ctrl+click to `click`, not `auxClick`, so
   `is_secondary(e)` in `lib/ui.svelte.ts` is that check written once.
-- Tab reaches `keydown` as an ordinary key, so `App.svelte` walks the window's fields with
-  `focus_next()` / `focus_previous()`. The focused field's own `onkeydown` runs first, and one that
-  spends Tab itself (the search box taking a completion) calls `spend_tab()` so the window skips it.
-  As of native 0.10, `focus_previous()` does not move off an `<input>` or `<textarea>`.
+- Tab and Shift+Tab move focus natively (gpuix-svelte 0.3.0), after every key handler has run. A
+  handler that wants the Tab for itself (the search box taking a completion) calls
+  `e.preventDefault()`; `e.stopPropagation()` in an `onkeydown` also hides the key from
+  `on_window_key` handlers.
 - Recording and playback work on macOS (AVFoundation via the clang-built `native/recorder-shim.m`)
   and on Windows (winmm's waveIn/waveOut straight over `bun:ffi`, no shim to compile —
   `lib/winmm.ts`, `lib/recorder-win.ts`, `lib/player-win.ts`).
