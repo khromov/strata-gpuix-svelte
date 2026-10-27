@@ -18,6 +18,7 @@ bun install          # gpuix-svelte brings its own Svelte build
 bun run ml:install   # once: the ML deps (transformers.js → onnxruntime-node, sharp; ~380 MB of
                      # prebuilds) live in the nested ml/ package so the root stays lean
 bun run start        # opens the window; saving a .svelte file hot-reloads it
+bun run start:wayland   # Linux only: force Wayland (start:x11 forces X11)
 bun run test         # test/brain.ts, then test/smoke.ts; no models, no network
 bun run typecheck    # tsc, then svelte-check against GPUI's element types
 bun run ml:doctor    # loads all three models under Bun and runs one inference each; the first

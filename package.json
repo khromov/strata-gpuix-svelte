@@ -6,6 +6,8 @@
 	"type": "module",
 	"scripts": {
 		"start": "gpuix-svelte --bun app.ts",
+		"start:wayland": "DISPLAY= gpuix-svelte --bun app.ts",
+		"start:x11": "WAYLAND_DISPLAY= gpuix-svelte --bun app.ts",
 		"test": "gpuix-svelte --bun test/brain.ts && gpuix-svelte --bun test/smoke.ts",
 		"build": "bun build.ts",
 		"typecheck": "tsc --noEmit && svelte-check --diagnostic-sources js,svelte --fail-on-warnings",

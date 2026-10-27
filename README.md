@@ -17,6 +17,8 @@ bun install             # the app's dependencies, gpuix-svelte and its Svelte bu
 bun run ml:install      # once: the ML dependencies (transformers.js + onnxruntime + sharp) into ml/
 bun run ml:doctor       # optional: proves the models run under Bun, downloads them (~380 MB)
 bun run start           # opens Strata; saving a .svelte file hot-reloads it
+bun run start:wayland   # Linux: force a Wayland window
+bun run start:x11       # Linux: force an X11 window
 bun run test            # test/brain.ts (data + native, no models) and test/smoke.ts (headless UI)
 bun run typecheck       # tsc, then svelte-check against GPUI's element types
 bun run build           # dist/Strata.app, models and all (macOS)
