@@ -132,9 +132,10 @@ const [cx, cy] = [card.x + 40, card.y + 20];
 click_at(cx, cy, { button: 2 });
 await wait();
 // The event's window coordinates and the <Portal>'s are the same space, or the menu misses the cursor.
-// getElementBounds reports the border box, so the panel's border and padding are inside it.
+// getElementBounds reports the border box (since @gpuix/native 0.11.0; before, it sat 7 px inside
+// it), so the panel's top-left corner is the cursor.
 const box = native.getElementBounds(find_test_id('menu')!.id)!;
-check('the menu opens at the cursor', box.x - cx === 7 && box.y - cy === 7, true);
+check('the menu opens at the cursor', box.x === cx && box.y === cy, true);
 check('right-clicking a card opens its menu', painted().includes('Copy text'));
 check('with the destructive action in it', painted().includes('Delete'));
 check('and it does not open the item', route.path, '/');
