@@ -10,7 +10,7 @@ contributors and coding agents.
 ```
   app.ts                 Bun guard → create_app() → render_hot(App.svelte, { props: { app } })
   standalone.ts          the compiled entry: static imports, render() instead of render_hot()
-  build.ts               standalone.ts → dist/strata → dist/Strata.app (bun run build)
+  build.ts               standalone.ts → dist/strata → the .app or strata-<os>-<arch>/ → one archive (bun run build)
   App.svelte             root layout, window-level shortcuts, the palette → set_css_vars, route table
   RouteView.svelte       resolves the route and lazy-loads the page component
   routes/                Everything, Kind, Search, Item, Ask, Feeds, Settings, NotFound; Item renders a
@@ -93,20 +93,37 @@ after three minutes, a worker that stops answering for a minute is killed, only 
 run Gemma at a time (a `gemma.lock` file in the models directory), and after any of that it stays
 off until Strata restarts.
 
-## The macOS app
+## The compiled app
 
-`bun run build` runs `build.ts`: `Bun.build({ compile })` over
-`standalone.ts` gives `dist/strata`, then `dist/Strata.app` is assembled around it.
-transformers.js cannot be compiled into a Bun binary (onnxruntime's dylib and sharp's addon are
-not embedded, see [huggingface/transformers.js#1672](https://github.com/huggingface/transformers.js/issues/1672)),
-and it never needs to be: the worker ships as source with its `node_modules` in
-`Contents/Resources/ml`, and the app launches it on its **own embedded Bun** by setting
-`BUN_BE_BUN=1`, which makes a compiled Bun executable behave as the plain `bun` CLI. The
-recorder shim is compiled at build time into `Contents/Resources/native`. Data lives in
-`~/Library/Application Support/Strata`. `CODESIGN_IDENTITY` and `NOTARY_PROFILE` sign
-(nested addons first, then the executable, then the bundle) and notarize, as gpuix-svelte's
-[shipping guide](https://github.com/khromov/gpuix-svelte/blob/main/docs/shipping.md) describes.
-The bundle is ~250 MB, most of it onnxruntime and sharp prebuilds.
+`bun run build` runs `build.ts`: `Bun.build({ compile })` over `standalone.ts` gives
+`dist/strata` (`strata.exe` on Windows, with the console hidden and an icon cut from
+`icon.png`), then the app is assembled around it: `dist/Strata.app` on macOS, a
+`dist/strata-<os>-<arch>/` directory elsewhere, and finally one archive,
+`dist/strata-<version>-<os>-<arch>.zip` (`.tar.gz` on Linux), the version read from
+`package.json`. transformers.js cannot be compiled into a Bun binary (onnxruntime's dylib and
+sharp's addon are not embedded, see
+[huggingface/transformers.js#1672](https://github.com/huggingface/transformers.js/issues/1672)),
+and it never needs to be: the worker ships as source with its `node_modules` in a resources
+directory beside the executable (`Contents/Resources/ml` in the .app, `resources/ml` next to
+`strata` otherwise; `resources_dir()` in `lib/paths.ts` checks both), and the app launches it
+on its **own embedded Bun** by setting `BUN_BE_BUN=1`, which makes a compiled Bun executable
+behave as the plain `bun` CLI. On macOS the recorder shim is compiled at build time into
+`Contents/Resources/native`; Windows needs no shim and Linux has no recorder. Data lives in the
+OS's application data directory (`default_root()` in `lib/paths.ts`). `CODESIGN_IDENTITY` and
+`NOTARY_PROFILE` sign (nested addons first, then the executable, then the bundle) and notarize,
+as gpuix-svelte's [shipping guide](https://github.com/khromov/gpuix-svelte/blob/main/docs/shipping.md)
+describes. An archive is ~110 MB, the unpacked app ~290 MB, most of it onnxruntime and sharp
+prebuilds.
+
+Builds are native, never cross-compiled: the GPUI addon that gets embedded, and the onnxruntime
+and sharp prebuilds that get copied, are the ones `bun install` fetched for the building
+machine. `.github/workflows/release.yml` therefore runs the build on one runner per target.
+release-please (`release-please-config.json`, `.release-please-manifest.json`) keeps a release
+PR open on `main` from the conventional commits since the last tag; merging it bumps
+`package.json`, writes `CHANGELOG.md`, tags `vX.Y.Z` and creates the GitHub release, and the
+matrix (macOS arm64, Linux x64, Windows x64, Windows arm64; `@gpuix/native` 0.11 has no
+prebuild for macOS Intel or Linux arm64) uploads its archives to it. A manual run of the
+workflow builds the matrix without releasing and keeps the archives as workflow artifacts.
 
 ## Things GPUI has no API for, and what stands in
 

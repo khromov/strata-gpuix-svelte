@@ -1,0 +1,76 @@
+name: release
+
+# release-please keeps a release PR open on main from the conventional commits since the last
+# tag (feat: → minor, fix: → patch, a `Release-As: x.y.z` footer → that version). Merging it
+# bumps package.json, writes CHANGELOG.md, tags vX.Y.Z and creates the GitHub release; the
+# build matrix then runs `bun run build` on one runner per target and uploads the archives
+# to that release. `workflow_dispatch` runs just the matrix, keeping the archives as workflow
+# artifacts, to try the builds without releasing.
+#
+# Only targets @gpuix/native ships a prebuild for are built: macOS Intel and Linux arm64 have
+# none, so there is nothing to embed for them.
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  release-please:
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    outputs:
+      release_created: ${{ steps.release.outputs.release_created }}
+      tag_name: ${{ steps.release.outputs.tag_name }}
+    steps:
+      - uses: googleapis/release-please-action@v4
+        id: release
+
+  build:
+    needs: release-please
+    # release-please is skipped on a manual run; `always()` keeps this job from being skipped
+    # with it.
+    if: always() && (needs.release-please.outputs.release_created == 'true' || github.event_name == 'workflow_dispatch')
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-14
+            target: macos-arm64
+          - os: ubuntu-latest
+            target: linux-x64
+          - os: windows-latest
+            target: windows-x64
+          - os: windows-11-arm
+            target: windows-arm64
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 60
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+      # The Linux prebuild of @gpuix/native links gpui's X11 client; the libraries are only
+      # needed if the addon is loaded, which bundling does not do, but they cost nothing.
+      - if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y libxcb1 libxkbcommon0 libxkbcommon-x11-0
+      - run: bun install --frozen-lockfile
+      - run: bun install --cwd ml --frozen-lockfile
+      - run: bun run build
+      - name: Upload to the release
+        if: needs.release-please.outputs.release_created == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release upload "${{ needs.release-please.outputs.tag_name }}" dist/strata-*-${{ matrix.target }}.* --clobber
+      - name: Keep as a workflow artifact
+        if: needs.release-please.outputs.release_created != 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: strata-${{ matrix.target }}
+          path: dist/strata-*-${{ matrix.target }}.*
+          if-no-files-found: error
