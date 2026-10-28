@@ -25,7 +25,7 @@ bun run test         # test/brain.ts, then test/smoke.ts; no models, no network
 bun run typecheck    # tsc, then svelte-check against GPUI's element types
 bun run ml:doctor    # loads all three models under Bun and runs one inference each; the first
                      # run downloads ~380 MB into .data/models
-bun run build        # dist/strata + dist/Strata.app (macOS only)
+bun run build        # this machine's app, archived: dist/strata-<version>-<os>-<arch>.zip|.tar.gz
 bun run import-hn    # pours the Hacker News front page into the real brain (scrape smoke test)
 bun run seed-load    # [count] [--fresh]: a copy of the brain plus 5000 generated items in
                      # .data/load; open it with GPUIX_BRAIN_DIR=.data/load. Downloads stay
@@ -138,17 +138,29 @@ Whisper/CLIP, and the worker's orphan watchdog.
 
 ## Building
 
-`bun run build` runs `build.ts`: `Bun.build({ compile })` over `standalone.ts` gives
-`dist/strata`, and `dist/Strata.app` is assembled around it. macOS only, and it needs
-`ml:install` first. transformers.js can't be compiled into a Bun binary
-(huggingface/transformers.js#1672), so the worker ships as source with its `node_modules` in
-`Contents/Resources` and the app runs it on its own embedded Bun (`BUN_BE_BUN=1`). onnxruntime-node
-ships every platform's prebuilt runtime, so the copy is pruned to the host's. The compiled app keeps
-its data in `~/Library/Application Support/Strata`. `CODESIGN_IDENTITY` signs with the hardened
-runtime and `NOTARY_PROFILE` then notarizes and staples (`xcrun notarytool store-credentials
-<profile>` once). `standalone.ts` mounts `App.svelte` with `render` and a static import, since a
-binary has no source to hot-reload; keep its window options in step with `app.ts` (both read
-`lib/window.ts`).
+`bun run build` runs `build.ts` on macOS, Linux or Windows: `Bun.build({ compile })` over
+`standalone.ts` gives `dist/strata` (`strata.exe`), which is staged as `dist/Strata.app` or
+`dist/strata-<os>-<arch>/` and archived as `dist/strata-<version>-<os>-<arch>.zip` (`.tar.gz`
+on Linux), the version from `package.json`. It needs `ml:install` first. transformers.js
+can't be compiled into a Bun binary (huggingface/transformers.js#1672), so the worker ships
+as source with its `node_modules` in a resources directory beside the executable
+(`Contents/Resources` in the .app, `resources/` otherwise; `resources_dir()` in `lib/paths.ts`
+checks both) and the app runs it on its own embedded Bun (`BUN_BE_BUN=1`). onnxruntime-node
+ships every platform's prebuilt runtime, so the copy is pruned to the host's. The compiled app
+keeps its data in the OS's application data directory. On macOS `CODESIGN_IDENTITY` signs with
+the hardened runtime and `NOTARY_PROFILE` then notarizes and staples (`xcrun notarytool
+store-credentials <profile>` once). `standalone.ts` mounts `App.svelte` with `render` and a
+static import, since a binary has no source to hot-reload; keep its window options in step
+with `app.ts` (both read `lib/window.ts`).
+
+Builds are native, not cross-compiled (the embedded GPUI addon and the copied onnxruntime and
+sharp prebuilds are whatever `bun install` fetched for the host), so
+`.github/workflows/release.yml` builds on one runner per target: macOS arm64, Linux x64,
+Windows x64 and Windows arm64, the targets `@gpuix/native` has prebuilds for (none for macOS
+Intel or Linux arm64). release-please drives it: conventional commits on `main` keep a release
+PR open, and merging it bumps `package.json`, tags `vX.Y.Z`, creates the GitHub release and
+triggers the matrix, which uploads the archives to it. Run the workflow by hand to build
+without releasing; the archives become workflow artifacts.
 
 ## Writing components
 

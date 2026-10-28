@@ -14,14 +14,16 @@ export interface DataDirs {
 let resources: string | null | undefined;
 
 /**
- * A compiled .app keeps the ML worker, its dependencies and the recorder shim in
- * Contents/Resources; from a checkout there is no such directory and this is null.
+ * A compiled app keeps the ML worker, its dependencies and the recorder shim beside the
+ * executable: Contents/Resources in the macOS .app, resources/ next to strata on Linux and
+ * Windows (build.ts). From a checkout there is no such directory and this is null.
  */
 export function resources_dir(): string | null {
 	if (resources !== undefined) return resources;
 	const forced = process.env.GPUIX_BRAIN_RESOURCES;
-	const candidate = forced || join(dirname(process.execPath), '..', 'Resources');
-	resources = existsSync(join(candidate, 'ml', 'worker.js')) ? candidate : null;
+	const exe_dir = dirname(process.execPath);
+	const candidates = forced ? [forced] : [join(exe_dir, '..', 'Resources'), join(exe_dir, 'resources')];
+	resources = candidates.find((dir) => existsSync(join(dir, 'ml', 'worker.js'))) ?? null;
 	return resources;
 }
 

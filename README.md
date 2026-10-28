@@ -80,22 +80,30 @@ download progress and memory use.
 
 ## Your data
 
-Everything lives in one file, `strata.sqlite`, inside the `.data` directory (or
-`~/Library/Application Support/Strata` for the built macOS app). Images, thumbnails and
+Everything lives in one file, `strata.sqlite`, inside the `.data` directory (or the OS's
+application data directory for the built app: `~/Library/Application Support/Strata`,
+`%APPDATA%\Strata` or `~/.local/share/strata`). Images, thumbnails and
 recordings are stored inside it, so copying that one file copies your whole brain. The `cache`
 directory beside it is disposable and rebuilds itself.
 
 An API key entered in Settings is stored in plain text in that file. Set `GPUIX_BRAIN_LLM_KEY`
 instead if you would rather it never touches disk.
 
-## Building the macOS app
+## Building
 
 ```bash
-bun run build   # dist/Strata.app, models and all
+bun run build   # the app for this machine, ML dependencies and all, archived under dist/
 ```
 
-Set `CODESIGN_IDENTITY` and `NOTARY_PROFILE` to sign and notarize it. The bundle is about
-250 MB. [docs/internals.md](docs/internals.md#the-macos-app) explains how it is put together.
+On macOS that is `dist/Strata.app`, zipped; on Linux and Windows a `strata-<os>-<arch>`
+directory with the executable and a `resources` directory beside it, as `.tar.gz` or `.zip`.
+Each archive is about 110 MB. Set `CODESIGN_IDENTITY` and `NOTARY_PROFILE` on macOS to sign
+and notarize. [docs/internals.md](docs/internals.md#the-compiled-app) explains how it is put
+together.
+
+Releases are cut by [release-please](https://github.com/googleapis/release-please): merging
+the release PR it keeps open on `main` tags a version, and the `release` workflow builds
+macOS arm64, Linux x64, Windows x64 and Windows arm64 and attaches them to the GitHub release.
 
 ## Configuration
 
