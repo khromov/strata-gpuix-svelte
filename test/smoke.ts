@@ -32,6 +32,7 @@ import {
 	find,
 	find_all,
 	find_test_id,
+	find_text,
 	click_text,
 	click_test_id,
 	hover,
@@ -92,7 +93,8 @@ check('brand painted', painted().includes('Strata'));
 // Off-screen rows of the virtual timeline are retained but not painted.
 check('seeded note in the timeline', all_text().some((t) => t.includes('Compost notes')));
 check('sidebar counts painted', painted().includes('Everything'));
-check('settings is a cog with no label', find_test_id('nav-settings') != null && !painted().includes('Settings'));
+// An exact text node: other text can mention Settings, like the recorder's hint on a machine with no microphone.
+check('settings is a cog with no label', find_test_id('nav-settings') != null && find_text('Settings') == null);
 
 // The sidebar is 244 wide with 14 of padding, and a long status has to truncate, not push the cog out.
 const footer_fits = () => {
