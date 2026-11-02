@@ -33,7 +33,7 @@
 	const show = (e: GpuixEvent) => open_menu(e, status_actions(), summary.text);
 </script>
 
-<div class="pill" hitbox="self" onclick={(e: GpuixEvent) => (is_secondary(e) ? show(e) : push('/settings'))} onauxclick={show}>
+<div class="pill" hitbox="self" onclick={(e: GpuixEvent) => (is_secondary(e) ? show(e) : push('/settings'))} onauxclick={show} testId="status-pill">
 	{#if summary.busy}
 		<Spinner size={12} />
 	{:else}
@@ -48,7 +48,7 @@
 <style>
 	.pill { display: flex; flex-direction: row; align-items: center; gap: 8px; padding: 8px 12px; border-radius: 999px; border-width: 1px; font-size: 12px; line-height: 16px; cursor: pointer; user-select: none; border-color: var(--border); color: var(--inkMuted); }
 	.pill:hover { background-color: var(--hover); }
-	.text { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+	.text { flex-grow: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 	.dot { width: 9px; height: 9px; border-radius: 5px; }
 	.dot.ok { background-color: var(--accent); }
 	.dot.warn { background-color: var(--ochre); }

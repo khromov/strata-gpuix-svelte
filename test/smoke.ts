@@ -32,6 +32,7 @@ import {
 	find,
 	find_all,
 	find_test_id,
+	find_text,
 	click_text,
 	click_test_id,
 	hover,
@@ -46,6 +47,7 @@ import {
 import type { ClickOptions } from 'gpuix-svelte/test';
 import type { Update } from 'gpuix-svelte/update';
 import { create_app } from '../lib/app.ts';
+import { data } from '../lib/data.svelte.ts';
 import { MlStub } from '../lib/ml-stub.ts';
 import { push, route } from '../lib/router.svelte.ts';
 import { DARK, LIGHT } from '../lib/theme.ts';
@@ -91,6 +93,30 @@ check('brand painted', painted().includes('Strata'));
 // Off-screen rows of the virtual timeline are retained but not painted.
 check('seeded note in the timeline', all_text().some((t) => t.includes('Compost notes')));
 check('sidebar counts painted', painted().includes('Everything'));
+// An exact text node: other text can mention Settings, like the recorder's hint on a machine with no microphone.
+check('settings is a cog with no label', find_test_id('nav-settings') != null && find_text('Settings') == null);
+
+// The sidebar is 244 wide with 14 of padding, and a long status has to truncate, not push the cog out.
+const footer_fits = () => {
+	const pill = native.getElementBounds(find_test_id('status-pill')!.id)!;
+	const cog = native.getElementBounds(find_test_id('nav-settings')!.id)!;
+	return pill.x + pill.width <= cog.x && cog.x + cog.width <= 230;
+};
+check('the cog sits to the right of the model status', footer_fits());
+const quiet_ml = data.ml;
+data.ml = { ...quiet_ml, whisper: { state: 'downloading', progress: 100, file: null, error: null } };
+await wait();
+check('the status says what it is downloading', painted().includes('downloading whisper'));
+check('and the cog stays beside it', footer_fits());
+data.ml = quiet_ml;
+await wait();
+click_test_id('nav-settings');
+await wait();
+await wait();
+check('the cog opens settings', route.path, '/settings');
+push('/');
+await wait();
+await wait();
 
 // The palette reaches every <style> through set_css_vars, so a mode switch is one restyle.
 const root_bg = () => find_test_id('root')!.style!.backgroundColor;
@@ -420,4 +446,4 @@ check('the startup check can be turned off', app.settings.get('updates.auto'), f
 console.log('screenshot:', screenshot(join(tmpdir(), 'strata-smoke.png')));
 
 app.close();
-finish('smoke', 98);
+finish('smoke', 103);
