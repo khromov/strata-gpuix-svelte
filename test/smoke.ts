@@ -137,7 +137,8 @@ await wait();
 // getElementBounds reports the border box (since @gpuix/native 0.11.0; before, it sat 7 px inside
 // it), so the panel's top-left corner is the cursor.
 const box = native.getElementBounds(find_test_id('menu')!.id)!;
-check('the menu opens at the cursor', box.x === cx && box.y === cy, true);
+console.log('menu placement:', JSON.stringify({ cursor: [cx, cy], box, viewport: [window_size.width, window_size.height] }));
+check('the menu opens at the cursor', [box.x, box.y], [cx, cy]);
 check('right-clicking a card opens its menu', painted().includes('Copy text'));
 check('with the destructive action in it', painted().includes('Delete'));
 check('and it does not open the item', route.path, '/');
