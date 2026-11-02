@@ -202,8 +202,8 @@ call's source, so its values are string literals and the call takes no spread.
 `gpuix-svelte` brings its own build of Svelte, the one with the custom renderer API, and resolves
 every `svelte` import to it. Keep `svelte` itself out of `package.json`.
 
-For now it is vendored: `vendor/gpuix-svelte-0.4.1-f530fb7.tgz` is `node scripts/publish.ts pack` of
-gpuix-svelte's main at f530fb7 (its package.json still says 0.4.1), because `gpuix-svelte/update`
+For now it is vendored: `vendor/gpuix-svelte-0.4.1-ba5cfb2.tgz` is `node scripts/publish.ts pack` of
+gpuix-svelte's main at ba5cfb2 (its package.json still says 0.4.1), because `gpuix-svelte/update`
 and `build({ archive })` ship in 0.5.0 and Bun refuses main as a git dependency: its svelte is a
 `file:` tarball, which Bun allows only in the root project. Once 0.5.0 is on npm, set
 `"gpuix-svelte": "^0.5.0"`, delete `vendor/` and run `bun install`.
