@@ -24,7 +24,7 @@ jobs:
       release_created: ${{ steps.release.outputs.release_created }}
       tag_name: ${{ steps.release.outputs.tag_name }}
     steps:
-      - uses: googleapis/release-please-action@v4
+      - uses: googleapis/release-please-action@v5
         id: release
         with:
           # A PAT lets the release PR trigger test.yml; GITHUB_TOKEN's events never start workflows.
@@ -43,7 +43,7 @@ jobs:
       run:
         shell: bash
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: oven-sh/setup-bun@v2
       # The Linux prebuild of @gpuix/native links gpui's X11 client, and the check below loads it.
       - if: runner.os == 'Linux'
@@ -106,12 +106,12 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           TAG: ${{ needs.release.outputs.tag_name }}
       - if: needs.release.outputs.release_created == 'true'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: update-${{ matrix.os }}
           path: dist/update-*.json
       - if: github.event_name == 'workflow_dispatch'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: strata-test-build-${{ matrix.os }}
           path: dist/strata-*.zip
@@ -126,10 +126,10 @@ jobs:
     if: ${{ !cancelled() && needs.release.outputs.release_created == 'true' }}
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: oven-sh/setup-bun@v2
       - run: bun install --frozen-lockfile
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           pattern: update-*
           merge-multiple: true
