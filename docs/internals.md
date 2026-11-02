@@ -123,7 +123,8 @@ directory to `dist/ml-runtime.zip`, `standalone.ts` embeds that file, and `lib/r
 on the first launch of each build, to `<data dir>/runtime/<version>-<size>/`, which appears whole or
 not at all, and deletes other builds' copies. The worker then runs from there as it does from
 `Contents/Resources`. If it can't be unpacked, the app opens without ML and Settings says why. The
-window waits for the unpacking; it took about a second on Linux, with about 1,400 files.
+window waits for the unpacking, of about 1,400 files: 1 s on Linux and 3 to 4 s on Windows on GitHub's
+runners, and an antivirus on a real machine may add to that.
 
 ## Releases and updates
 
