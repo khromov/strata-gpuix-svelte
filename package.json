@@ -1,7 +1,7 @@
 {
 	"name": "strata-gpuix-svelte",
 	"private": true,
-	"version": "1.0.0",
+	"version": "1.0.1",
 	"description": "Strata, a second brain in a native GPUI window: notes, links, images and voice memos, hybrid search and RAG chat, built with gpuix-svelte",
 	"type": "module",
 	"scripts": {
