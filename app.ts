@@ -3,6 +3,8 @@
  * Node twins, so every script passes `--bun` to the gpuix-svelte bin.
  */
 
+import { fileURLToPath } from 'node:url';
+
 if (!process.versions.bun) {
 	console.error('[strata] Strata needs Bun — `bun run start` runs `gpuix-svelte --bun app.ts`');
 	process.exit(1);
@@ -15,7 +17,7 @@ const { WINDOW } = await import('./lib/window.ts');
 
 const stub = process.env.GPUIX_BRAIN_STUB === '1';
 const app = await create_app({
-	data_dir: process.env.GPUIX_BRAIN_DIR || (stub ? new URL('./.data/stub', import.meta.url).pathname : null),
+	data_dir: process.env.GPUIX_BRAIN_DIR || (stub ? fileURLToPath(new URL('./.data/stub', import.meta.url)) : null),
 	seed: stub
 });
 
