@@ -41,7 +41,7 @@ export async function read_text(): Promise<string> {
 	const cmd = read_command();
 	if (!cmd) return '';
 	try {
-		const proc = track(Bun.spawn(cmd, { stdin: 'ignore', stdout: 'pipe', stderr: 'ignore', env }));
+		const proc = track(Bun.spawn(cmd, { stdin: 'ignore', stdout: 'pipe', stderr: 'ignore', env, windowsHide: true }));
 		const [text, code] = await Promise.all([new Response(proc.stdout).text(), proc.exited]);
 		return code === 0 ? text : '';
 	} catch (err) {
@@ -54,7 +54,7 @@ export async function write_text(text: string): Promise<boolean> {
 	const cmd = write_command();
 	if (!cmd) return false;
 	try {
-		const proc = track(Bun.spawn(cmd, { stdin: 'pipe', stdout: 'ignore', stderr: 'ignore', env }));
+		const proc = track(Bun.spawn(cmd, { stdin: 'pipe', stdout: 'ignore', stderr: 'ignore', env, windowsHide: true }));
 		proc.stdin.write(text);
 		proc.stdin.end();
 		return (await proc.exited) === 0;

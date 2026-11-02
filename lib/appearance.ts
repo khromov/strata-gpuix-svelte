@@ -29,7 +29,7 @@ export function system_appearance(): Appearance {
 	if (forced()) return forced()!;
 	if (!cmd) return 'dark';
 	try {
-		const result = Bun.spawnSync(cmd, { stdin: 'ignore', stdout: 'pipe', stderr: 'ignore' });
+		const result = Bun.spawnSync(cmd, { stdin: 'ignore', stdout: 'pipe', stderr: 'ignore', windowsHide: true });
 		return parse_appearance(process.platform, result.exitCode, result.stdout.toString());
 	} catch {
 		return 'dark';
@@ -41,7 +41,7 @@ export async function system_appearance_async(): Promise<Appearance> {
 	if (forced()) return forced()!;
 	if (!cmd) return 'dark';
 	try {
-		const proc = Bun.spawn(cmd, { stdin: 'ignore', stdout: 'pipe', stderr: 'ignore' });
+		const proc = Bun.spawn(cmd, { stdin: 'ignore', stdout: 'pipe', stderr: 'ignore', windowsHide: true });
 		const [stdout, code] = await Promise.all([new Response(proc.stdout).text(), proc.exited]);
 		return parse_appearance(process.platform, code, stdout);
 	} catch {

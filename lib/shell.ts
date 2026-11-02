@@ -4,7 +4,8 @@ import { warn } from './log.ts';
 // Bun.spawn throws on a missing binary instead of emitting an 'error' event.
 function spawn_detached(cmd: string[]): boolean {
 	try {
-		const proc = Bun.spawn(cmd, { stdin: 'ignore', stdout: 'ignore', stderr: 'ignore' });
+		// `cmd` would flash a console; `explorer` has none, and the flag would hide the folder window it opens.
+		const proc = Bun.spawn(cmd, { stdin: 'ignore', stdout: 'ignore', stderr: 'ignore', windowsHide: cmd[0] === 'cmd' });
 		proc.unref();
 		return true;
 	} catch (err) {
