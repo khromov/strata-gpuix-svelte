@@ -205,3 +205,9 @@ and `build({ archive })` ship in 0.5.0 and Bun refuses main as a git dependency:
 The ML stack is a separate
 package in `ml/` with its own `bun.lock`; Bun blocks onnxruntime-node's postinstall, which only
 fetches CUDA binaries for Linux, and nothing here needs it.
+
+`launch-video/` is another separate package (`bun install --cwd launch-video`; ~900 MB once Remotion
+has fetched its headless Chrome and cached a bundle): the Remotion scaffold from
+EveryInc/product-launch-video at 68660ae, which the `product-launch-video` skill in `.claude/skills/`
+works in. It is React and the app never imports it, so the root `tsconfig.json` excludes it; check
+it with `bunx tsc --noEmit` from inside.

@@ -19,5 +19,5 @@
 	},
 	"svelteOptions": { "namespace": "gpuixHTML" },
 	"include": ["**/*.ts", "**/*.svelte"],
-	"exclude": ["**/node_modules", ".data", "dist"]
+	"exclude": ["**/node_modules", ".data", "dist", "launch-video"]
 }
