@@ -12,6 +12,7 @@
 	import { back, push, route, type RouteEntry } from './lib/router.svelte.ts';
 	import { bind_theme, start_system_poll, tokens } from './lib/theme.svelte.ts';
 	import { focus, ui } from './lib/ui.svelte.ts';
+	import { start_updates } from './lib/updates.svelte.ts';
 	import RouteView from './RouteView.svelte';
 
 	let { app }: { app: App } = $props();
@@ -21,6 +22,7 @@
 		bind_app(app);
 		bind_theme(app);
 		bind_feeds(app);
+		start_updates(app);
 		// Before the template below is styled; the $effect only carries later switches.
 		set_css_vars(tokens());
 	});

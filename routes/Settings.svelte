@@ -1,6 +1,7 @@
 <script lang="ts">
 	import Button from '../components/Button.svelte';
 	import Field from '../components/Field.svelte';
+	import Markdown from '../components/Markdown.svelte';
 	import ProgressBar from '../components/ProgressBar.svelte';
 	import Scroller from 'gpuix-svelte/components/Scroller.svelte';
 	import Segmented from '../components/Segmented.svelte';
@@ -11,10 +12,11 @@
 	import { GEMMA_BYTES, GEMMA_ID, GEMMA_NAME } from '../lib/llm-local.ts';
 	import { MODEL_IDS, type ModelName } from '../lib/ml-client.ts';
 	import type { SettingKey } from '../lib/settings.ts';
-	import { reveal } from '../lib/shell.ts';
+	import { open_url, reveal } from '../lib/shell.ts';
 	import { set_mode, theme, type ThemeMode } from '../lib/theme.svelte.ts';
 	import type { IconName } from '../lib/icons.ts';
 	import { toast } from '../lib/ui.svelte.ts';
+	import { check_updates, install_update, running_version, update_busy, updates, why_not } from '../lib/updates.svelte.ts';
 	import Modal from '../components/Modal.svelte';
 	import Toggle from '../components/Toggle.svelte';
 	import { push } from '../lib/router.svelte.ts';
@@ -32,6 +34,8 @@
 	let language = $state(settings.get('stt.language') ?? '');
 	let schedule = $state(settings.get('feeds.schedule'));
 	let testing = $state(false);
+	let auto_update = $state(settings.get('updates.auto') !== false);
+	const version = running_version();
 
 	const save = (key: SettingKey, prop: keyof typeof llm, value: string) => {
 		llm[prop] = value;
@@ -113,8 +117,59 @@
 	const STATE_LABEL: Record<string, string> = { unloaded: 'not loaded', downloading: 'downloading', loading: 'loading', ready: 'ready', error: 'error' };
 </script>
 
+{#snippet updates_section()}
+	<div class="section" testId="settings-updates">
+		<div class="heading">Updates</div>
+		{#if !version}
+			<div class="hint">Running from source, so there is nothing to update here. Built copies of Strata update themselves from its GitHub releases.</div>
+		{:else}
+			{#if updates.update}
+				{@const update = updates.update}
+				<div class="model">
+					<div class="model-text">
+						<div class="model-name">Version {update.version} is available</div>
+						<div class="model-note">This copy is {update.current}</div>
+						{#if updates.phase === 'downloading'}
+							<ProgressBar value={updates.progress} />
+						{/if}
+					</div>
+					{#if updates.phase === 'downloading' || updates.phase === 'installing'}
+						<div class="model-state">
+							<Spinner size={12} />
+							<div>{updates.phase === 'installing' ? 'installing, Strata will restart' : `downloading${updates.progress != null ? ` ${updates.progress}%` : ''}`}</div>
+						</div>
+					{:else if update.installable}
+						<Button label="Install and restart" icon="download" variant="primary" small testid="update-install" onclick={install_update} />
+					{:else if update.url}
+						<Button label="Open the release page" icon="link" small testid="update-page" onclick={() => open_url(update.url!)} />
+					{/if}
+				</div>
+				{#if !update.installable}
+					<div class="hint">{why_not(update)}</div>
+				{/if}
+				{#if update.notes}
+					<div class="notes"><Markdown source={update.notes} /></div>
+				{/if}
+			{/if}
+			{#if updates.error}
+				<div class="problem">{updates.error}</div>
+			{/if}
+			<Toggle label="Check for updates when Strata starts" checked={auto_update} onchange={(v) => { auto_update = v; settings.set('updates.auto', v); }} testid="update-auto" />
+			<div class="actions">
+				<Button label={updates.phase === 'checking' ? 'Checking…' : 'Check for updates'} icon="refresh" small disabled={update_busy()} testid="update-check" onclick={() => check_updates({ manual: true })} />
+				<div class="status">Strata {version}{updates.phase === 'current' ? ' is up to date' : ''}</div>
+			</div>
+		{/if}
+	</div>
+{/snippet}
+
 <div class="route">
 	<Scroller pad="24px 28px 36px 28px" gap={24}>
+		<!-- First when there is one, because the sidebar's button lands here. -->
+		{#if updates.update}
+			{@render updates_section()}
+		{/if}
+
 		<div class="section">
 			<div class="heading">Language model</div>
 			<div class="setting">
@@ -259,6 +314,10 @@
 				{/if}
 			</div>
 		</div>
+
+		{#if !updates.update}
+			{@render updates_section()}
+		{/if}
 	</Scroller>
 </div>
 
@@ -284,6 +343,7 @@
 	.model-state.ready { color: var(--accent); }
 	.model-state.error { color: var(--danger); }
 	.model-state.unloaded { color: var(--inkFaint); }
+	.notes { display: flex; flex-direction: column; padding: 14px 16px; border-radius: 10px; background-color: var(--well); }
 	.job { display: flex; flex-direction: row; align-items: center; gap: 10px; padding: 8px 12px; border-radius: 8px; font-size: 13px; line-height: 18px; background-color: var(--well); }
 	.job-title { flex-grow: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 	.job-step { white-space: nowrap; color: var(--inkMuted); }

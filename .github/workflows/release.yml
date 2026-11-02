@@ -1,0 +1,125 @@
+name: release
+
+# release-please keeps a release PR open from the conventional commits (feat:, fix:, …) on main.
+# Merging it tags a release; then macOS builds Strata.app and uploads its archive, and one job
+# writes update.json, which the app checks at
+# https://github.com/khromov/strata-gpuix-svelte/releases/latest/download/update.json
+# (standalone.ts names that URL). docs/internals.md covers the secrets, all of them optional.
+# Run by hand (`gh workflow run release.yml`), it only builds and signs, publishes nothing, and keeps
+# the zip as a workflow artifact, which is how to try the signing secrets before a real release.
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  release:
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    outputs:
+      release_created: ${{ steps.release.outputs.release_created }}
+      tag_name: ${{ steps.release.outputs.tag_name }}
+    steps:
+      - uses: googleapis/release-please-action@v4
+        id: release
+        with:
+          # A PAT lets the release PR trigger test.yml; GITHUB_TOKEN's events never start workflows.
+          token: ${{ secrets.RELEASE_PLEASE_TOKEN || secrets.GITHUB_TOKEN }}
+
+  # macOS only: on Windows and Linux the updater swaps a single executable, which cannot carry the
+  # ML worker and its node_modules, so build.ts makes nothing there.
+  build:
+    needs: release
+    # release is skipped on a manual run, and always() keeps this job from being skipped with it.
+    if: ${{ always() && (needs.release.outputs.release_created == 'true' || github.event_name == 'workflow_dispatch') }}
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+      - run: bun install --frozen-lockfile
+      - run: bun install --cwd ml --frozen-lockfile
+      - name: Import the macOS signing certificate
+        if: env.MACOS_CERTIFICATE != ''
+        env:
+          MACOS_CERTIFICATE: ${{ secrets.MACOS_CERTIFICATE }}
+          MACOS_CERTIFICATE_PASSWORD: ${{ secrets.MACOS_CERTIFICATE_PASSWORD }}
+        run: |
+          echo "$MACOS_CERTIFICATE" | base64 --decode > certificate.p12
+          security create-keychain -p actions build.keychain
+          security default-keychain -s build.keychain
+          security unlock-keychain -p actions build.keychain
+          # A new keychain locks itself after five idle minutes, which a slow build can outlast.
+          security set-keychain-settings -lut 21600 build.keychain
+          security import certificate.p12 -k build.keychain -P "$MACOS_CERTIFICATE_PASSWORD" -T /usr/bin/codesign
+          security set-key-partition-list -S apple-tool:,apple: -s -k actions build.keychain
+          rm certificate.p12
+      - run: bun build.ts --archive
+        env:
+          CODESIGN_IDENTITY: ${{ secrets.CODESIGN_IDENTITY }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+      # With a certificate configured, a build that came out unsigned or not notarized fails here
+      # rather than reaching every installed copy.
+      - name: Refuse an unsigned build
+        if: env.MACOS_CERTIFICATE != ''
+        env:
+          MACOS_CERTIFICATE: ${{ secrets.MACOS_CERTIFICATE }}
+        run: |
+          codesign --verify --deep --strict dist/Strata.app
+          spctl --assess --type execute dist/Strata.app
+      # --clobber lets a re-run replace its upload.
+      - if: needs.release.outputs.release_created == 'true'
+        run: gh release upload --clobber "$TAG" dist/strata-*.zip
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ needs.release.outputs.tag_name }}
+      - if: needs.release.outputs.release_created == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: update-fragment
+          path: dist/update-*.json
+      - if: github.event_name == 'workflow_dispatch'
+        uses: actions/upload-artifact@v4
+        with:
+          name: strata-test-build
+          path: dist/strata-*.zip
+          if-no-files-found: error
+          retention-days: 7
+
+  # Until this runs, the new release's manifest is a 404 and apps keep their version.
+  manifest:
+    needs: [release, build]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+      - run: bun install --frozen-lockfile
+      - uses: actions/download-artifact@v4
+        with:
+          name: update-fragment
+          path: fragments
+      - run: gh release view "$TAG" --json body --jq .body > notes.md
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ needs.release.outputs.tag_name }}
+      # --no-install: the bin comes from the gpuix-svelte in node_modules, never from the registry.
+      # With the GPUIX_UPDATE_PUBLIC_KEY variable set, an unsigned or wrongly signed manifest
+      # fails here instead of being refused by every app in the field.
+      - run: |
+          bunx --bun --no-install gpuix-svelte update manifest --out update.json \
+            --base-url "https://github.com/$REPO/releases/download/$TAG/" \
+            --notes notes.md --url "https://github.com/$REPO/releases/tag/$TAG" \
+            ${PUBLIC_KEY:+--public-key "$PUBLIC_KEY"} \
+            fragments/*.json
+          gh release upload --clobber "$TAG" update.json
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GPUIX_UPDATE_KEY: ${{ secrets.GPUIX_UPDATE_KEY }}
+          PUBLIC_KEY: ${{ vars.GPUIX_UPDATE_PUBLIC_KEY }}
+          REPO: ${{ github.repository }}
+          TAG: ${{ needs.release.outputs.tag_name }}

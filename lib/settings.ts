@@ -17,6 +17,7 @@ export interface SettingValues {
 	'feeds.include': boolean;
 	'feeds.schedule': string;
 	'reader.textSize': number;
+	'updates.auto': boolean;
 }
 
 export type SettingKey = keyof SettingValues;
@@ -42,7 +43,8 @@ export const SETTINGS: Record<SettingKey, SettingSpec> = {
 	'index.embedModel': { default: null, internal: true },
 	'feeds.include': { default: true },
 	'feeds.schedule': { default: DEFAULT_SCHEDULE },
-	'reader.textSize': { default: READER_SIZE }
+	'reader.textSize': { default: READER_SIZE },
+	'updates.auto': { default: true }
 };
 
 const mask = (value: unknown) => (value ? `${'•'.repeat(Math.max(0, Math.min(12, String(value).length - 4)))}${String(value).slice(-4)}` : '');

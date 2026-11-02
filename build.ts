@@ -1,16 +1,20 @@
 /**
- * Strata → dist/strata + dist/Strata.app. transformers.js cannot be
- * compiled into a Bun binary (huggingface/transformers.js#1672: onnxruntime's
- * dylib and sharp's addon are not embedded), and it never has to be: the models run
- * in a child process, so the worker ships as source with its node_modules in
- * Contents/Resources, and the app runs it on its own embedded Bun (BUN_BE_BUN=1).
+ * Strata → dist/Strata.app. gpuix-svelte's build() compiles standalone.ts and makes the .app with
+ * its icon and plist; this adds what only Strata needs, before anything is signed.
+ * transformers.js cannot be compiled into a Bun binary (huggingface/transformers.js#1672:
+ * onnxruntime's dylib and sharp's addon are not embedded), and it never has to be: the models run
+ * in a child process, so the worker ships as source with its node_modules in Contents/Resources,
+ * and the app runs it on its own embedded Bun (BUN_BE_BUN=1).
+ *
+ * `--archive` also writes the zip to distribute and the fragment `gpuix-svelte update manifest`
+ * merges, which .github/workflows/release.yml uploads. macOS only: the updater swaps a single
+ * executable on Windows and Linux, and that cannot carry Resources.
  */
 
 import { spawnSync } from 'node:child_process';
-import { chmodSync, copyFileSync, cpSync, existsSync, mkdirSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:fs';
+import { cpSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { join, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import type { BunPlugin } from 'bun';
 
 if (!process.versions.bun) {
 	console.error('[build] needs Bun — `bun run build` runs `bun build.ts`');
@@ -23,45 +27,26 @@ if (process.platform !== 'darwin') {
 
 const root = fileURLToPath(new URL('./', import.meta.url));
 const dist = join(root, 'dist');
-const binary = join(dist, 'strata');
-const bundle = join(dist, 'Strata.app');
+const archive = process.argv.includes('--archive');
 const identity = process.env.CODESIGN_IDENTITY;
-const notary = process.env.NOTARY_PROFILE;
+// A keychain profile on a developer's machine; an Apple ID on CI, where there is no keychain profile.
+const notary = process.env.NOTARY_PROFILE
+	? ['--keychain-profile', process.env.NOTARY_PROFILE]
+	: process.env.APPLE_ID && process.env.APPLE_PASSWORD && process.env.APPLE_TEAM_ID
+		? ['--apple-id', process.env.APPLE_ID, '--password', process.env.APPLE_PASSWORD, '--team-id', process.env.APPLE_TEAM_ID]
+		: null;
+
+// build() signs right after it makes the bundle: before Resources exists, without nested signing
+// and with entitlements that have no microphone. So it never sees the identity, and notarize()
+// below runs while beforeArchive still can, which leaves build() to zip the stapled bundle.
+delete process.env.CODESIGN_IDENTITY;
 
 if (!existsSync(join(root, 'ml/node_modules/@huggingface/transformers/package.json'))) {
 	console.error('[build] the ML dependencies are not installed; run `bun run ml:install` first');
 	process.exit(1);
 }
 
-const PLIST = `<?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-<plist version="1.0">
-<dict>
-	<key>CFBundleExecutable</key>
-	<string>strata</string>
-	<key>CFBundleIconFile</key>
-	<string>AppIcon</string>
-	<key>CFBundleIdentifier</key>
-	<string>dev.gpuix.svelte.strata</string>
-	<key>CFBundleName</key>
-	<string>Strata</string>
-	<key>CFBundleDisplayName</key>
-	<string>Strata</string>
-	<key>CFBundleShortVersionString</key>
-	<string>0.1.0</string>
-	<key>CFBundleVersion</key>
-	<string>1</string>
-	<key>CFBundlePackageType</key>
-	<string>APPL</string>
-	<key>LSMinimumSystemVersion</key>
-	<string>13.0</string>
-	<key>NSHighResolutionCapable</key>
-	<true/>
-	<key>NSMicrophoneUsageDescription</key>
-	<string>Strata records voice memos and transcribes them on this Mac.</string>
-</dict>
-</plist>
-`;
+const MICROPHONE_USAGE = 'Strata records voice memos and transcribes them on this Mac.';
 
 // Under the hardened runtime Bun's JavaScriptCore JIT needs the executable-memory
 // entitlements, and the GPUI addon, onnxruntime and sharp are dlopen'd without our
@@ -88,133 +73,68 @@ const ENTITLEMENTS = `<?xml version="1.0" encoding="UTF-8"?>
 </plist>
 `;
 
-// Imported after the guard: a static import would hoist `bun` above it.
-const { load_module, load_svelte, resolve_native_cjs, resolve_svelte } = await import('gpuix-svelte/plugin');
+// Imported after the guards: a static import would hoist `bun` above them.
+const { build } = await import('gpuix-svelte/build');
 const { CLANG_ARGS } = await import('./lib/recorder.ts');
 
-let components = 0;
-const svelte_plugin: BunPlugin = {
-	name: 'gpuix-svelte',
-	setup(build) {
-		build.onResolve({ filter: /^@gpuix\/native$/ }, resolve_native_cjs);
-		build.onResolve({ filter: /^svelte(\/|$)/ }, resolve_svelte(['custom-renderer', 'production']));
-		build.onLoad({ filter: /\.svelte\.[jt]s$/ }, load_module);
-		build.onLoad({ filter: /\.svelte$/ }, (args) => {
-			components++;
-			return load_svelte(args);
-		});
+const result = await build({ entry: join(root, 'standalone.ts'), outdir: dist, archive, beforeArchive: ({ output }) => complete(output) });
+if (!archive) await complete(result.output);
+
+async function complete(bundle: string) {
+	const plist = join(bundle, 'Contents', 'Info.plist');
+	writeFileSync(plist, readFileSync(plist, 'utf8').replace('</dict>', `\t<key>NSMicrophoneUsageDescription</key>\n\t<string>${MICROPHONE_USAGE}</string>\n</dict>`));
+
+	const resources = join(bundle, 'Contents', 'Resources');
+	mkdirSync(join(resources, 'ml'), { recursive: true });
+	mkdirSync(join(resources, 'native'), { recursive: true });
+
+	// Each worker is bundled to one file (the lib/ modules it shares inlined) and keeps its
+	// real node_modules beside it: onnxruntime and sharp load from there as usual.
+	await bundle_worker('worker', resources);
+	await bundle_worker('llm-worker', resources);
+	copy_file('ml/package.json', join(resources, 'ml', 'package.json'));
+	console.log('[build] copying the ML dependencies (a few hundred MB)');
+	// Dereferenced: the update archive refuses symlinks, and node_modules/.bin has some.
+	cpSync(join(root, 'ml/node_modules'), join(resources, 'ml', 'node_modules'), { recursive: true, dereference: true });
+	prune_foreign_runtimes(join(resources, 'ml', 'node_modules'));
+	prune_wasm_backend(join(resources, 'ml', 'node_modules'));
+
+	run('clang', [...CLANG_ARGS, '-o', join(resources, 'native', 'recorder-shim.dylib'), join(root, 'native/recorder-shim.m')]);
+
+	console.log(`[build] ${relative(root, bundle)} (${mb(dir_size(bundle))} MB)`);
+
+	if (!identity) {
+		console.log('[build] CODESIGN_IDENTITY not set; leaving the output unsigned');
+	} else {
+		sign_bundle(bundle, resources);
 	}
-};
 
-// mpg123-decoder's entry also pulls in a WebWorker class the bundler emits as undefined
-// ("MPEGDecoderWebWorker is not defined" at startup), and its exports map blocks the deep
-// import that would avoid it — so the decoder class is resolved directly here.
-const mpg123_plugin: BunPlugin = {
-	name: 'mpg123-direct',
-	setup(build) {
-		build.onResolve({ filter: /^mpg123-decoder$/ }, () => ({ path: 'mpg123-decoder', namespace: 'mpg123' }));
-		build.onLoad({ filter: /.*/, namespace: 'mpg123' }, () => ({
-			contents: `export { default as MPEGDecoder } from ${JSON.stringify(join(root, 'node_modules/mpg123-decoder/src/MPEGDecoder.js'))};`,
-			loader: 'js'
-		}));
+	if (!notary) {
+		console.log('[build] neither NOTARY_PROFILE nor APPLE_ID + APPLE_PASSWORD + APPLE_TEAM_ID set; skipping notarization');
+	} else if (!identity) {
+		console.log('[build] notarization needs CODESIGN_IDENTITY; skipping it');
+	} else {
+		notarize(bundle);
 	}
-};
+}
 
-rmSync(binary, { force: true });
-rmSync(bundle, { recursive: true, force: true });
-mkdirSync(dist, { recursive: true });
-
-const result = await Bun.build({
-	entrypoints: [join(root, 'standalone.ts')],
-	target: 'bun',
-	// Bun implies `development` unless NODE_ENV is production at build time, and
-	// esm-env lists it first, so both are needed for Svelte's production runtime.
-	conditions: ['custom-renderer', 'production'],
-	define: { 'process.env.NODE_ENV': '"production"' },
-	minify: true,
-	plugins: [svelte_plugin, mpg123_plugin],
-	throw: false,
-	compile: {
-		outfile: binary,
-		autoloadBunfig: false,
-		autoloadDotenv: false
+async function bundle_worker(name: string, resources: string) {
+	const worker = await Bun.build({
+		entrypoints: [join(root, `ml/${name}.ts`)],
+		target: 'bun',
+		external: ['@huggingface/transformers'],
+		naming: `${name}.js`,
+		throw: false
+	});
+	if (!worker.success) {
+		for (const message of worker.logs) console.error(message);
+		process.exit(1);
 	}
-});
-
-if (!result.success) {
-	for (const message of result.logs) console.error(message);
-	process.exit(1);
-}
-if (components === 0) {
-	console.error('[build] no .svelte file went through the plugin');
-	process.exit(1);
+	writeFileSync(join(resources, 'ml', `${name}.js`), await worker.outputs[0].text());
 }
 
-const size = statSync(binary).size;
-const floor = statSync(process.execPath).size + 12 * 1024 * 1024;
-if (size < floor) {
-	console.error(`[build] ${relative(root, binary)} is ${mb(size)} MB, under the ${mb(floor)} MB floor — the GPUI addon was not embedded`);
-	process.exit(1);
-}
-
-const macos = join(bundle, 'Contents', 'MacOS');
-const resources = join(bundle, 'Contents', 'Resources');
-mkdirSync(macos, { recursive: true });
-mkdirSync(join(resources, 'ml'), { recursive: true });
-mkdirSync(join(resources, 'native'), { recursive: true });
-copyFileSync(binary, join(macos, 'strata'));
-chmodSync(join(macos, 'strata'), 0o755);
-writeFileSync(join(bundle, 'Contents', 'Info.plist'), PLIST);
-write_icns(join(root, 'icon.png'), join(resources, 'AppIcon.icns'));
-
-// Each worker is bundled to one file (the lib/ modules it shares inlined) and keeps its
-// real node_modules beside it: onnxruntime and sharp load from there as usual.
-const worker = await Bun.build({
-	entrypoints: [join(root, 'ml/worker.ts')],
-	target: 'bun',
-	external: ['@huggingface/transformers'],
-	naming: 'worker.js',
-	throw: false
-});
-if (!worker.success) {
-	for (const message of worker.logs) console.error(message);
-	process.exit(1);
-}
-writeFileSync(join(resources, 'ml', 'worker.js'), await worker.outputs[0].text());
-const llm_worker = await Bun.build({
-	entrypoints: [join(root, 'ml/llm-worker.ts')],
-	target: 'bun',
-	external: ['@huggingface/transformers'],
-	naming: 'llm-worker.js',
-	throw: false
-});
-if (!llm_worker.success) {
-	for (const message of llm_worker.logs) console.error(message);
-	process.exit(1);
-}
-writeFileSync(join(resources, 'ml', 'llm-worker.js'), await llm_worker.outputs[0].text());
-copyFileSync(join(root, 'ml/package.json'), join(resources, 'ml', 'package.json'));
-console.log('[build] copying the ML dependencies (a few hundred MB)');
-cpSync(join(root, 'ml/node_modules'), join(resources, 'ml', 'node_modules'), { recursive: true, dereference: true });
-prune_foreign_runtimes(join(resources, 'ml', 'node_modules'));
-prune_wasm_backend(join(resources, 'ml', 'node_modules'));
-
-run('clang', [...CLANG_ARGS, '-o', join(resources, 'native', 'recorder-shim.dylib'), join(root, 'native/recorder-shim.m')]);
-
-console.log(`[build] ${relative(root, binary)} (${mb(size)} MB) + ${relative(root, bundle)} (${mb(dir_size(bundle))} MB)`);
-
-if (!identity) {
-	console.log('[build] CODESIGN_IDENTITY not set; leaving the output unsigned');
-} else {
-	sign_bundle();
-}
-
-if (!notary) {
-	console.log('[build] NOTARY_PROFILE not set; skipping notarization');
-} else if (!identity) {
-	console.log('[build] NOTARY_PROFILE needs CODESIGN_IDENTITY; skipping notarization');
-} else {
-	notarize(bundle);
+function copy_file(from: string, to: string) {
+	writeFileSync(to, readFileSync(join(root, from)));
 }
 
 function mb(bytes: number) {
@@ -268,10 +188,10 @@ function dir_size(path: string) {
 
 // Nested Mach-O files (the addons and their dylibs under Resources) are signed
 // first, inside out, as Apple's notarization requires; --deep is not enough.
-function sign_bundle() {
+function sign_bundle(bundle: string, resources: string) {
 	const entitlements = join(dist, 'entitlements.plist');
 	writeFileSync(entitlements, ENTITLEMENTS);
-	const nested = [];
+	const nested: string[] = [];
 	(function walk(p: string) {
 		for (const name of readdirSync(p)) {
 			const full = join(p, name);
@@ -282,7 +202,7 @@ function sign_bundle() {
 	for (const target of nested) {
 		run('codesign', ['--force', '--options', 'runtime', '--timestamp', '--sign', identity!, target]);
 	}
-	run('codesign', ['--force', '--options', 'runtime', '--timestamp', '--entitlements', entitlements, '--sign', identity!, join(macos, 'strata')]);
+	run('codesign', ['--force', '--options', 'runtime', '--timestamp', '--entitlements', entitlements, '--sign', identity!, join(bundle, 'Contents', 'MacOS', 'strata')]);
 	run('codesign', ['--force', '--options', 'runtime', '--timestamp', '--entitlements', entitlements, '--sign', identity!, bundle]);
 	run('codesign', ['--verify', '--strict', bundle]);
 	console.log(`[build] signed ${relative(root, bundle)} (${nested.length} nested binaries) as ${identity}`);
@@ -292,35 +212,27 @@ function notarize(target: string) {
 	const zip = join(dist, 'Strata.zip');
 	run('ditto', ['-c', '-k', '--keepParent', target, zip]);
 	console.log('[build] notarizing (Apple usually takes a few minutes)');
-	const output = run('xcrun', ['notarytool', 'submit', zip, '--keychain-profile', notary!, '--wait']);
+	const output = run('xcrun', ['notarytool', 'submit', zip, ...notary!, '--wait']);
 	if (!/status: Accepted/.test(output)) {
 		console.error(`[build] notarization was not accepted; see \`xcrun notarytool log\` for the submission below\n${output}`);
 		process.exit(1);
 	}
 	run('xcrun', ['stapler', 'staple', target]);
 	run('spctl', ['--assess', '--type', 'execute', target]);
-	run('ditto', ['-c', '-k', '--keepParent', target, zip]);
-	console.log(`[build] notarized and stapled; ${relative(root, zip)} is the one to ship`);
-}
-
-// iconutil only reads an .iconset directory holding the ten standard sizes,
-// which sips cuts from the 1024px source; both ship with macOS.
-function write_icns(png: string, out: string) {
-	const iconset = join(dist, 'AppIcon.iconset');
-	rmSync(iconset, { recursive: true, force: true });
-	mkdirSync(iconset);
-	for (const points of [16, 32, 128, 256, 512]) {
-		run('sips', ['-z', `${points}`, `${points}`, png, '--out', join(iconset, `icon_${points}x${points}.png`)]);
-		run('sips', ['-z', `${points * 2}`, `${points * 2}`, png, '--out', join(iconset, `icon_${points}x${points}@2x.png`)]);
+	// With --archive, build() zips the stapled bundle next, and that is the one to ship.
+	rmSync(zip, { force: true });
+	if (!archive) {
+		run('ditto', ['-c', '-k', '--keepParent', target, zip]);
+		console.log(`[build] notarized and stapled; ${relative(root, zip)} is the one to ship`);
 	}
-	run('iconutil', ['-c', 'icns', iconset, '-o', out]);
-	rmSync(iconset, { recursive: true, force: true });
 }
 
 function run(command: string, args: string[]) {
 	const { status, stdout, stderr } = spawnSync(command, args, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
 	if (status !== 0) {
-		console.error(`[build] ${command} ${args.join(' ')} failed:\n${stderr || stdout}`);
+		// notarytool's --password must not end up in a log through the error.
+		const shown = args.map((arg, i) => (args[i - 1] === '--password' ? '***' : arg));
+		console.error(`[build] ${command} ${shown.join(' ')} failed:\n${stderr || stdout}`);
 		process.exit(1);
 	}
 	return stdout;

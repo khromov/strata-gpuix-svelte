@@ -10,7 +10,8 @@ contributors and coding agents.
 ```
   app.ts                 Bun guard → create_app() → render_hot(App.svelte, { props: { app } })
   standalone.ts          the compiled entry: static imports, render() instead of render_hot()
-  build.ts               standalone.ts → dist/strata → dist/Strata.app (bun run build)
+  build.ts               standalone.ts → dist/Strata.app (bun run build); --archive for a release
+  vendor/                gpuix-svelte's main, packed, until 0.5.0 is on npm
   App.svelte             root layout, window-level shortcuts, the palette → set_css_vars, route table
   RouteView.svelte       resolves the route and lazy-loads the page component
   routes/                Everything, Kind, Search, Item, Ask, Feeds, Settings, NotFound; Item renders a
@@ -20,7 +21,7 @@ contributors and coding agents.
                          whoever needs a dialog, ContextMenu one mounted once by App; scrolling
                          is the package's Scroller
   lib/                   the data layer (plain TS) and the UI state (.svelte.ts runes modules);
-                         menus.ts is what each right click offers
+                         menus.ts is what each right click offers, updates.svelte.ts the updater
   lib/feeds/             the poller (poll.ts, croner) over a source registry; rss.ts reads RSS 2.0,
                          RDF and Atom, and another kind is a module plus an entry in SOURCES
   ml/worker.ts           the child process that owns the models; ml/doctor.ts is the spike
@@ -95,8 +96,8 @@ off until Strata restarts.
 
 ## The macOS app
 
-`bun run build` runs `build.ts`: `Bun.build({ compile })` over
-`standalone.ts` gives `dist/strata`, then `dist/Strata.app` is assembled around it.
+`bun run build` runs `build.ts`: `build()` from `gpuix-svelte/build` compiles `standalone.ts` and
+makes `dist/Strata.app` with its icon and plist, then `build.ts` adds what only Strata needs.
 transformers.js cannot be compiled into a Bun binary (onnxruntime's dylib and sharp's addon are
 not embedded, see [huggingface/transformers.js#1672](https://github.com/huggingface/transformers.js/issues/1672)),
 and it never needs to be: the worker ships as source with its `node_modules` in
@@ -106,7 +107,108 @@ recorder shim is compiled at build time into `Contents/Resources/native`. Data l
 `~/Library/Application Support/Strata`. `CODESIGN_IDENTITY` and `NOTARY_PROFILE` sign
 (nested addons first, then the executable, then the bundle) and notarize, as gpuix-svelte's
 [shipping guide](https://github.com/khromov/gpuix-svelte/blob/main/docs/shipping.md) describes.
-The bundle is ~250 MB, most of it onnxruntime and sharp prebuilds.
+`build.ts` does that itself and keeps the identity from `build()`, which signs before Resources
+exists and without the microphone entitlement. The bundle is ~270 MB, most of it the Bun runtime
+and the onnxruntime and sharp prebuilds, and its zip ~100 MB.
+
+## Releases and updates
+
+`.github/workflows/release.yml` runs on every push to `main`. release-please keeps a PR open that
+bumps `package.json` and the changelog from the conventional commits (`feat:`, `fix:`) since the
+last release; merging it tags the release. Then macOS runs `bun build.ts --archive` and uploads
+the zip, and a last job writes `update.json` with the release notes and uploads that. Until it
+finishes the new release's manifest is a 404, which a startup check only logs.
+
+The app asks for
+`https://github.com/khromov/strata-gpuix-svelte/releases/latest/download/update.json`, which GitHub
+redirects to the newest release's copy, so no API or token is involved. A newer version is offered
+in the sidebar and in Settings → Updates (`lib/updates.svelte.ts`). `install()` checks the zip's
+hash and size, extracts it beside the app, checks the bundle's identifier and version, swaps the
+`.app` and starts the new one, which reports back before the old one exits; a new version that does
+not report within ten seconds is rolled back. Extracting blocks the frame loop for a few seconds.
+The new instance reports and waits for the old one at the top of `standalone.ts`, before
+`create_app()`, so they don't share the database or a worker unless the old one outlasts the ten
+seconds that wait allows. That means a rollback only covers a version that can't load at all: one that fails later, in
+`create_app()`, stays installed, and shows a dialog pointing at the releases page
+(`startup_failed` in `lib/dialogs.ts`). On Windows and Linux the updater swaps a single executable, which cannot carry the ML
+worker and its `node_modules`, so releases are macOS only.
+
+If a release's build fails, use Re-run failed jobs, which keeps the release job's output. Re-running
+every job runs release-please again, which has nothing new to create, so the build is skipped. If
+the failure needs a code fix, that release never gets a zip or `update.json`: make a new one with a
+`fix:` commit. Until then installed copies get a 404 from their check, which they only log.
+
+Without `RELEASE_PLEASE_TOKEN`, release-please opens its PR with `GITHUB_TOKEN`, which needs "Allow
+GitHub Actions to create and approve pull requests" left on under the repository's Actions settings.
+
+Everything below is optional, as repository secrets:
+
+| Secret | What it does |
+|---|---|
+| `GPUIX_UPDATE_KEY` | Signs `update.json`; the PEM from `bunx --bun --no-install gpuix-svelte update keygen`. Keep a copy: losing it means shipped apps refuse every later update |
+| `CODESIGN_IDENTITY`, `MACOS_CERTIFICATE`, `MACOS_CERTIFICATE_PASSWORD` | Sign the app: the identity, and that certificate as a base64 `.p12` with its password |
+| `APPLE_ID`, `APPLE_PASSWORD`, `APPLE_TEAM_ID` | Notarize, with an app-specific password. Needs the signing secrets too |
+| `RELEASE_PLEASE_TOKEN` | A PAT, so the release PR triggers `test.yml`; `GITHUB_TOKEN`'s events start no workflows |
+
+To sign the manifest, also put the public key `keygen` prints in `standalone.ts`
+(`update: { manifest, publicKey }`) and in a repository variable, `GPUIX_UPDATE_PUBLIC_KEY`, which
+makes the release fail rather than ship a manifest the apps would refuse. Without a key the app
+trusts whoever can publish to the repository's releases, over HTTPS. Without the macOS secrets the
+app is unsigned, which does not affect updating but makes macOS block a first install until it is
+allowed under System Settings → Privacy & Security.
+
+### Setting up signing
+
+This needs an Apple Developer Program membership, and only its account holder can create a
+Developer ID certificate.
+
+1. In Keychain Access, choose Certificate Assistant → Request a Certificate From a Certificate
+   Authority and save it to disk. At
+   https://developer.apple.com/account/resources/certificates/add choose Developer ID Application,
+   upload the request, download the `.cer` and open it. `security find-identity -v -p codesigning`
+   then prints `Developer ID Application: Your Name (TEAMID)`. A Mac without Xcode can lack the
+   intermediate certificate, which shows as `0 valid identities` and `codesign` failing with
+   `errSecInternalComponent`; open https://www.apple.com/certificateauthority/DeveloperIDG2CA.cer too.
+2. Create an app-specific password at https://account.apple.com, under Sign-In and Security.
+3. For local builds, run this, which prompts for that password:
+
+   ```bash
+   xcrun notarytool store-credentials notary --apple-id you@example.com --team-id TEAMID
+   ```
+
+   Then put the identity and profile in a `.env` beside `package.json`, which is gitignored:
+
+   ```
+   CODESIGN_IDENTITY="Developer ID Application: Your Name (TEAMID)"
+   NOTARY_PROFILE=notary
+   ```
+
+   `bun run build` now signs and notarizes, and `spctl --assess --type execute dist/Strata.app`
+   accepts the result. A 403 "required agreement is missing or has expired" means the account
+   holder has to accept the current agreement at https://appstoreconnect.apple.com/agreements.
+4. For releases, export the identity from Keychain Access → My Certificates as a password-protected
+   `.p12`, then run these in your own terminal, so the values stay out of any log. Each `gh secret
+   set` without piped input prompts for its value. Afterwards keep the `.p12` somewhere safe, such
+   as a password manager, and delete it from disk.
+
+   ```bash
+   R=khromov/strata-gpuix-svelte
+   base64 -i cert.p12 | gh secret set MACOS_CERTIFICATE -R $R
+   gh secret set MACOS_CERTIFICATE_PASSWORD -R $R
+   gh secret set CODESIGN_IDENTITY -R $R
+   gh secret set APPLE_ID -R $R
+   gh secret set APPLE_PASSWORD -R $R
+   gh secret set APPLE_TEAM_ID -R $R
+   ```
+
+Once `MACOS_CERTIFICATE` is set, the release fails unless the app comes out signed and notarized, so
+set all six together. To try them without publishing anything, run `gh workflow run release.yml`: it
+builds, signs and notarizes, and keeps the zip as a workflow artifact for seven days.
+
+To try the swap locally, build with `manifest: 'http://localhost:8765/update.json'` (plain `http:`
+is allowed to `localhost` only) at one version, move that `.app` aside, build the next version with
+`--archive`, and write the manifest from its fragment with `--base-url http://localhost:8765/`.
+Serve `dist/` and run the old app with `GPUIX_BRAIN_DIR` set to a scratch directory.
 
 ## Things GPUI has no API for, and what stands in
 
@@ -168,5 +270,5 @@ the page extractor, the SSE parser, the chunker, the vector index, the store and
 stub worker, the feed parser and poller against fixture documents, the Windows microphone consent
 parser, and the real IPC client against a fake worker, including a forced crash. Then it runs
 `test/smoke.ts`, which mounts the app headlessly and
-captures, opens, and deletes a note through GPUI's real hit testing. Neither needs a model or the
-network.
+captures, opens, and deletes a note through GPUI's real hit testing, and walks the updater's states
+on a fake `Update`. Neither needs a model or the network.

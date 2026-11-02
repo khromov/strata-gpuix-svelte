@@ -1,4 +1,6 @@
 import { track } from './lifecycle.ts';
+import { error } from './log.ts';
+import { open_url } from './shell.ts';
 
 export type FileKinds = 'image' | 'audio' | 'any';
 
@@ -99,4 +101,29 @@ async function run(cmd: string[]) {
 		proc.exited
 	]);
 	return { stdout, stderr, code };
+}
+
+const RELEASES = 'https://github.com/khromov/strata-gpuix-svelte/releases';
+
+/**
+ * create_app() failed in a built app, which has no window yet and no terminal, so without this it
+ * would just disappear. After an update this is the one way out: the old version has already
+ * exited, so nothing rolls this one back (see standalone.ts).
+ */
+export function startup_failed(err: unknown, updated_from: string | null): never {
+	const reason = (err as Error)?.message ?? String(err);
+	error('could not start:', err);
+	const lead = updated_from ? `Strata was just updated from ${updated_from}, and this version could not start.` : 'Strata could not start.';
+	const message = `${lead}\n\n${reason}\n\nYour notes are stored separately from the app. Other versions are on the releases page.`;
+	if (process.platform === 'darwin') {
+		// As an argument rather than in the script, so nothing in the error can break out of it.
+		const lines = [
+			'on run argv',
+			'return button returned of (display alert "Strata could not start" message (item 1 of argv) as critical buttons {"Quit", "Open releases page"} default button "Quit")',
+			'end run'
+		];
+		const { stdout } = Bun.spawnSync(['osascript', ...lines.flatMap((line) => ['-e', line]), message]);
+		if (stdout.toString().trim() === 'Open releases page') open_url(RELEASES);
+	}
+	process.exit(1);
 }
