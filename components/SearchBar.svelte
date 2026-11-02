@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { blur, get_native, type GpuixEvent, type ShadowNode } from 'gpuix-svelte';
+	import { blur, read_native, type GpuixEvent, type ShadowNode } from 'gpuix-svelte';
 	import Portal from 'gpuix-svelte/components/Portal.svelte';
 	import SearchSuggest from './SearchSuggest.svelte';
 	import { push, replace, route } from '../lib/router.svelte.ts';
@@ -60,11 +60,12 @@
 
 	function show_suggestions() {
 		const items = focused ? suggestions_for(value) : [];
-		if (!items.length || !node?.nativeId) {
+		const id = node?.nativeId;
+		if (!items.length || !id) {
 			ui.suggest = null;
 			return;
 		}
-		const bounds = get_native()?.getElementBounds(node.nativeId);
+		const bounds = read_native((native) => native.getElementBounds(id));
 		if (!bounds) return;
 		const { x, y, width, height } = bounds;
 		ui.suggest = { items, active: 0, left: x - 12, top: y + height + 6, width: width + 24 };

@@ -5,7 +5,9 @@
 	import { set_mode, theme, type ThemeMode } from '../lib/theme.svelte.ts';
 	import type { IconName } from '../lib/icons.ts';
 	import { is_secondary, open_menu } from '../lib/ui.svelte.ts';
+	import { updates } from '../lib/updates.svelte.ts';
 	import { blur, type GpuixEvent } from 'gpuix-svelte';
+	import Button from './Button.svelte';
 	import Icon from './Icon.svelte';
 	import NavItem from './NavItem.svelte';
 	import Segmented from './Segmented.svelte';
@@ -53,6 +55,9 @@
 	<div class="spacer"></div>
 
 	<div class="footer">
+		{#if updates.update}
+			<Button label="Update to {updates.update.version}" icon="download" small testid="sidebar-update" onclick={() => push('/settings')} />
+		{/if}
 		<StatusPill />
 		<div class="row">
 			<Segmented options={THEMES} value={theme.mode} onchange={set_mode} small />

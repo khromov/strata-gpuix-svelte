@@ -44,12 +44,14 @@ import {
 	finish
 } from 'gpuix-svelte/test';
 import type { ClickOptions } from 'gpuix-svelte/test';
+import type { Update } from 'gpuix-svelte/update';
 import { create_app } from '../lib/app.ts';
 import { MlStub } from '../lib/ml-stub.ts';
 import { push, route } from '../lib/router.svelte.ts';
 import { DARK, LIGHT } from '../lib/theme.ts';
 import { set_mode } from '../lib/theme.svelte.ts';
 import { ui } from '../lib/ui.svelte.ts';
+import { check_updates, updates } from '../lib/updates.svelte.ts';
 
 const RSS = `<rss version="2.0"><channel><title>Newsonaut</title><link>https://feed.test/</link>
 <item><title>Mycelium and the wood wide web</title><link>https://feed.test/post-1</link><guid>post-1</guid>
@@ -342,7 +344,76 @@ check('settings carries the same switch', find_test_id('settings-feeds') != null
 // The tick is a filled box, so the palette's accent is what says the switch is on.
 check('and it carries what search just set', find_test_id('settings-feeds')?.children?.[0]?.style?.backgroundColor, DARK.accent);
 
+// Updates. A checkout has no manifest, so the startup check found nothing and went nowhere.
+check('a checkout has no update', updates.update, null);
+check('and settings says why', painted().includes('Running from source'));
+
+// From here this pretends to be a built app, with a fake Update: the real install swaps the running app.
+process.env.GPUIX_APP_INFO = JSON.stringify({ name: 'Strata', slug: 'strata', identifier: 'dev.gpuix.svelte.strata', version: '0.1.0' });
+let installs = 0;
+const install_error = new Error('the new version did not start; the previous one is back in place');
+const release: Update = {
+	version: '0.2.0',
+	current: '0.1.0',
+	notes: '### Features\n\n* a thing worth restarting for',
+	platform: 'darwin-arm64',
+	asset: { url: 'https://updates.test/strata.zip', sha256: '0'.repeat(64) },
+	installable: true,
+	installed: false,
+	download: async ({ onProgress } = {}) => {
+		onProgress?.(1, 4);
+		return '/nonexistent';
+	},
+	install: async () => {
+		installs++;
+		throw install_error;
+	}
+};
+const reopen_settings = async () => {
+	push('/');
+	await wait();
+	push('/settings');
+	await wait();
+	await wait();
+};
+
+await check_updates({ check: async () => null });
+await reopen_settings();
+check('a built app knows its version', painted().includes('Strata 0.1.0 is up to date'));
+
+await check_updates({ check: () => Promise.reject(new Error('manifest: 404')) });
+check('a startup check that fails bothers nobody', updates.error, null);
+await check_updates({ manual: true, check: () => Promise.reject(new Error('manifest: 404')) });
+await wait();
+check('a check you asked for says what went wrong', painted().includes('manifest: 404'));
+
+await check_updates({ check: async () => release });
+await reopen_settings();
+check('the sidebar says there is an update', find_test_id('sidebar-update') != null);
+check('settings offers it first', painted().indexOf('Version 0.2.0 is available') < painted().indexOf('Language model'));
+check('with its release notes', painted().includes('a thing worth restarting for'));
+push('/');
+await wait();
+click_test_id('sidebar-update');
+await wait();
+await wait();
+check('the sidebar button lands on it', find_test_id('update-install') != null);
+click_test_id('update-install');
+check('installing runs the update', await eventually(() => installs === 1));
+check('an install that fails says so', await eventually(() => painted().includes('the previous one is back in place')));
+check('and it can be tried again', find_test_id('update-install') != null);
+
+await check_updates({ check: async () => ({ ...release, installable: false, reason: 'translocated', url: 'https://updates.test/release' }) });
+await wait();
+check('a copy that cannot update says what to do', painted().includes('Move Strata to Applications'));
+check('and offers no install', find_test_id('update-install'), null);
+check('only the release page', find_test_id('update-page') != null);
+
+click_test_id('update-auto');
+await wait();
+check('the startup check can be turned off', app.settings.get('updates.auto'), false);
+
 console.log('screenshot:', screenshot(join(tmpdir(), 'strata-smoke.png')));
 
 app.close();
-finish('smoke', 81);
+finish('smoke', 97);

@@ -10,7 +10,7 @@ and the decisions behind it.
 ## Documentation
 
 GPUI's elements, styling and events follow their own rules, so read the docs before writing UI code.
-Fetch https://khromov.github.io/gpuix-svelte/llms.txt, then the pages it links for the task at hand.
+Fetch https://gpuix-svelte.stanislav.garden/llms.txt, then the pages it links for the task at hand.
 
 ## Commands
 
@@ -25,7 +25,7 @@ bun run test         # test/brain.ts, then test/smoke.ts; no models, no network
 bun run typecheck    # tsc, then svelte-check against GPUI's element types
 bun run ml:doctor    # loads all three models under Bun and runs one inference each; the first
                      # run downloads ~380 MB into .data/models
-bun run build        # dist/strata + dist/Strata.app (macOS only)
+bun run build        # dist/Strata.app (macOS only); --archive adds the zip and update fragment
 bun run import-hn    # pours the Hacker News front page into the real brain (scrape smoke test)
 bun run seed-load    # [count] [--fresh]: a copy of the brain plus 5000 generated items in
                      # .data/load; open it with GPUIX_BRAIN_DIR=.data/load. Downloads stay
@@ -91,6 +91,13 @@ fake data and a stub worker — screenshots), `START=/settings`, `THEME=light|da
 - The palette is `LIGHT`/`DARK` in `lib/theme.ts`, handed to `set_css_vars` from an `$effect` in
   `App.svelte`; a theme switch is one call. `components/Icon.svelte` sets its tones explicitly,
   since a parent's `:hover` colour never reaches an `<svg>`.
+- A built app updates itself (`lib/updates.svelte.ts` over `gpuix-svelte/update`): at startup it
+  reads `update.json` from the latest GitHub release (not with `OFFLINE=1` or the setting off), the
+  sidebar and Settings → Updates offer what it finds, and installing swaps the whole `.app` and
+  restarts it. `standalone.ts` calls `wait_for_previous_instance()` before `create_app()`, so two
+  instances never share the database. `.github/workflows/release.yml` publishes: release-please cuts
+  the version from conventional commits (`feat:`, `fix:`), macOS builds, `update.json` comes last.
+  docs/internals.md has the steps and secrets. A checkout has no manifest, so a check is a no-op.
 - Shared state lives in `.svelte.ts` modules (route, theme, UI state). They are deliberately one
   instance per process, so they survive a hot remount, and editing one needs a restart.
 
@@ -108,7 +115,8 @@ provider choice and Ask through the stub.
 `test/smoke.ts` mounts the app headlessly and captures, opens, deletes through GPUI's real hit
 testing; a long page paints only the rows in view. Prefer the click/press/hover helpers over
 calling `dispatch()` directly, which bypasses hit testing; `wait_for(pred)` waits on timers (a
-tooltip's delay), and `painted_highlights()` reads back what `highlight` painted.
+tooltip's delay), and `painted_highlights()` reads back what `highlight` painted. The updater's
+states run on a fake `Update`, since the real install swaps the running app and exits.
 
 The headless renderer (Metal) crashes under a sandboxed shell ("Swift Fatal error: Array index out
 of range", hiservices XPC errors); run tests and the app with the sandbox off.
@@ -138,17 +146,23 @@ Whisper/CLIP, and the worker's orphan watchdog.
 
 ## Building
 
-`bun run build` runs `build.ts`: `Bun.build({ compile })` over `standalone.ts` gives
-`dist/strata`, and `dist/Strata.app` is assembled around it. macOS only, and it needs
-`ml:install` first. transformers.js can't be compiled into a Bun binary
+`bun run build` runs `build.ts`: `build()` from `gpuix-svelte/build` compiles `standalone.ts` and
+makes `dist/Strata.app`, then `build.ts` adds the microphone usage string, the workers, their
+`node_modules` and the recorder shim, and signs. macOS only, and it needs `ml:install` first.
+`--archive` also writes `dist/strata-<version>-darwin-arm64.zip` and `dist/update-darwin-arm64.json`
+for `gpuix-svelte update manifest`; the version is package.json's, which release-please bumps.
+`build()` signs before its `beforeArchive` hook runs and without the microphone entitlement, so
+`build.ts` keeps `CODESIGN_IDENTITY` from it and does the signing in that hook. `build()` takes no
+plugins either, which is why `lib/mp3.ts` imports the decoder by path. transformers.js can't be compiled into a Bun binary
 (huggingface/transformers.js#1672), so the worker ships as source with its `node_modules` in
 `Contents/Resources` and the app runs it on its own embedded Bun (`BUN_BE_BUN=1`). onnxruntime-node
 ships every platform's prebuilt runtime, so the copy is pruned to the host's. The compiled app keeps
 its data in `~/Library/Application Support/Strata`. `CODESIGN_IDENTITY` signs with the hardened
-runtime and `NOTARY_PROFILE` then notarizes and staples (`xcrun notarytool store-credentials
-<profile>` once). `standalone.ts` mounts `App.svelte` with `render` and a static import, since a
-binary has no source to hot-reload; keep its window options in step with `app.ts` (both read
-`lib/window.ts`).
+runtime and `NOTARY_PROFILE` (`xcrun notarytool store-credentials <profile>` once), or on CI
+`APPLE_ID`, `APPLE_PASSWORD` and `APPLE_TEAM_ID`, then notarizes and staples. `standalone.ts` mounts
+`App.svelte` with `render` and a static import, since a binary has no source to hot-reload; keep its
+window options in step with `app.ts` (both read `lib/window.ts`). The build reads `app` from that
+call's source, so its values are string literals and the call takes no spread.
 
 ## Writing components
 
@@ -180,6 +194,14 @@ binary has no source to hot-reload; keep its window options in step with `app.ts
 ## Dependencies
 
 `gpuix-svelte` brings its own build of Svelte, the one with the custom renderer API, and resolves
-every `svelte` import to it. Keep `svelte` itself out of `package.json`. The ML stack is a separate
+every `svelte` import to it. Keep `svelte` itself out of `package.json`.
+
+For now it is vendored: `vendor/gpuix-svelte-0.4.1-f530fb7.tgz` is `node scripts/publish.ts pack` of
+gpuix-svelte's main at f530fb7 (its package.json still says 0.4.1), because `gpuix-svelte/update`
+and `build({ archive })` ship in 0.5.0 and Bun refuses main as a git dependency: its svelte is a
+`file:` tarball, which Bun allows only in the root project. Once 0.5.0 is on npm, set
+`"gpuix-svelte": "^0.5.0"`, delete `vendor/` and run `bun install`.
+
+The ML stack is a separate
 package in `ml/` with its own `bun.lock`; Bun blocks onnxruntime-node's postinstall, which only
 fetches CUDA binaries for Linux, and nothing here needs it.

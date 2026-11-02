@@ -4,9 +4,15 @@
  * inline into the standalone binary.
  */
 
-import { MPEGDecoder } from 'mpg123-decoder';
+import type { MPEGDecoder as MPEGDecoderClass } from 'mpg123-decoder';
+// @ts-expect-error: no declarations at this path, so the cast below takes the package's own.
+import DecoderModule from '../node_modules/mpg123-decoder/src/MPEGDecoder.js';
 import { createMp3Encoder } from 'wasm-media-encoders';
 import { decode_wav, resample } from './wav.ts';
+
+// By path: the package's entry also pulls in a WebWorker class that a compiled binary dies on at
+// startup ("vm is not defined"), and its exports map blocks a deep import by name.
+const MPEGDecoder = DecoderModule as typeof MPEGDecoderClass;
 
 export async function encode_mp3(wav: Uint8Array, { bitrate = 32 }: { bitrate?: 8 | 16 | 24 | 32 | 40 | 48 | 64 } = {}): Promise<Uint8Array> {
 	const { samples, sampleRate } = decode_wav(wav);
