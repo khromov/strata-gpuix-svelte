@@ -2,15 +2,13 @@
 	import { data } from '../lib/data.svelte.ts';
 	import { brand_actions } from '../lib/menus.ts';
 	import { push, route } from '../lib/router.svelte.ts';
-	import { set_mode, theme, type ThemeMode } from '../lib/theme.svelte.ts';
-	import type { IconName } from '../lib/icons.ts';
 	import { is_secondary, open_menu } from '../lib/ui.svelte.ts';
 	import { updates } from '../lib/updates.svelte.ts';
 	import { blur, type GpuixEvent } from 'gpuix-svelte';
 	import Button from './Button.svelte';
 	import Icon from './Icon.svelte';
+	import IconButton from './IconButton.svelte';
 	import NavItem from './NavItem.svelte';
-	import Segmented from './Segmented.svelte';
 	import StatusPill from './StatusPill.svelte';
 
 
@@ -19,13 +17,12 @@
 		blur();
 	}
 
-	const show = (e: GpuixEvent) => open_menu(e, brand_actions(), 'Strata');
+	function settings() {
+		if (route.path !== '/settings') push('/settings');
+		blur();
+	}
 
-	const THEMES: Array<{ value: ThemeMode; icon: IconName }> = [
-		{ value: 'light', icon: 'sun' },
-		{ value: 'dark', icon: 'moon' },
-		{ value: 'system', icon: 'monitor' }
-	];
+	const show = (e: GpuixEvent) => open_menu(e, brand_actions(), 'Strata');
 </script>
 
 <div class="sidebar">
@@ -58,10 +55,9 @@
 		{#if updates.update}
 			<Button label="Update to {updates.update.version}" icon="download" small testid="sidebar-update" onclick={() => push('/settings')} />
 		{/if}
-		<StatusPill />
 		<div class="row">
-			<Segmented options={THEMES} value={theme.mode} onchange={set_mode} small />
-			<NavItem label="Settings" icon="settings" path="/settings" />
+			<div class="status"><StatusPill /></div>
+			<IconButton icon="settings" tip="Settings" tip_side="top" size={34} active={route.path === '/settings'} testid="nav-settings" onclick={settings} />
 		</div>
 	</div>
 </div>
@@ -76,5 +72,6 @@
 	.section { padding: 14px 12px 6px 12px; font-size: 12px; line-height: 16px; font-weight: 600; color: var(--inkFaint); }
 	.spacer { flex-grow: 1; }
 	.footer { display: flex; flex-direction: column; gap: 12px; }
-	.row { display: flex; flex-direction: row; align-items: center; justify-content: space-between; gap: 6px; }
+	.row { display: flex; flex-direction: row; align-items: center; gap: 6px; }
+	.status { display: flex; flex-direction: column; flex-grow: 1; flex-basis: 0; min-width: 0; }
 </style>

@@ -11,6 +11,7 @@
 		danger = false,
 		disabled = false,
 		size = 28,
+		tip_side = 'bottom',
 		testid = null
 	}: {
 		icon: IconName;
@@ -21,6 +22,8 @@
 		danger?: boolean;
 		disabled?: boolean;
 		size?: number;
+		/** Below by default, since most icon buttons sit in the top bar. */
+		tip_side?: 'top' | 'bottom';
 		testid?: string | null;
 	} = $props();
 
@@ -47,8 +50,7 @@
 {/snippet}
 
 {#if tip}
-	<!-- Below, since every icon button sits in the top bar. -->
-	<Tooltip content={tip} side="bottom" children={button} />
+	<Tooltip content={tip} side={tip_side} children={button} />
 {:else}
 	{@render button()}
 {/if}
