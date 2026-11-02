@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.0.1](https://github.com/khromov/strata-gpuix-svelte/compare/v1.0.0...v1.0.1) (2026-11-02)
+
+
+### Bug Fixes
+
+* make the sidebar footer just the model status and a settings cog ([#4](https://github.com/khromov/strata-gpuix-svelte/issues/4)) ([9249396](https://github.com/khromov/strata-gpuix-svelte/commit/92493967de4cf285a12b0e47244d49755481a59f))
+
 ## 1.0.0 (2026-11-02)
 
 
