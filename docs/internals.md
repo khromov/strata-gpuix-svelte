@@ -126,9 +126,20 @@ in the sidebar and in Settings → Updates (`lib/updates.svelte.ts`). `install()
 hash and size, extracts it beside the app, checks the bundle's identifier and version, swaps the
 `.app` and starts the new one, which reports back before the old one exits; a new version that does
 not report within ten seconds is rolled back. Extracting blocks the frame loop for a few seconds.
-The new instance waits for the old one before `create_app()`, so they never share the database or a
-worker. On Windows and Linux the updater swaps a single executable, which cannot carry the ML
+The new instance reports and waits for the old one at the top of `standalone.ts`, before
+`create_app()`, so they don't share the database or a worker unless the old one outlasts the ten
+seconds that wait allows. That means a rollback only covers a version that can't load at all: one that fails later, in
+`create_app()`, stays installed, and shows a dialog pointing at the releases page
+(`startup_failed` in `lib/dialogs.ts`). On Windows and Linux the updater swaps a single executable, which cannot carry the ML
 worker and its `node_modules`, so releases are macOS only.
+
+If a release's build fails, use Re-run failed jobs, which keeps the release job's output. Re-running
+every job runs release-please again, which has nothing new to create, so the build is skipped. If
+the failure needs a code fix, that release never gets a zip or `update.json`: make a new one with a
+`fix:` commit. Until then installed copies get a 404 from their check, which they only log.
+
+Without `RELEASE_PLEASE_TOKEN`, release-please opens its PR with `GITHUB_TOKEN`, which needs "Allow
+GitHub Actions to create and approve pull requests" left on under the repository's Actions settings.
 
 Everything below is optional, as repository secrets:
 

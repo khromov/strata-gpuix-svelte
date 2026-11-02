@@ -51,7 +51,7 @@ import { push, route } from '../lib/router.svelte.ts';
 import { DARK, LIGHT } from '../lib/theme.ts';
 import { set_mode } from '../lib/theme.svelte.ts';
 import { ui } from '../lib/ui.svelte.ts';
-import { check_updates, updates } from '../lib/updates.svelte.ts';
+import { check_updates, update_busy, updates } from '../lib/updates.svelte.ts';
 
 const RSS = `<rss version="2.0"><channel><title>Newsonaut</title><link>https://feed.test/</link>
 <item><title>Mycelium and the wood wide web</title><link>https://feed.test/post-1</link><guid>post-1</guid>
@@ -387,11 +387,14 @@ check('a startup check that fails bothers nobody', updates.error, null);
 await check_updates({ manual: true, check: () => Promise.reject(new Error('manifest: 404')) });
 await wait();
 check('a check you asked for says what went wrong', painted().includes('manifest: 404'));
+await check_updates({ check: () => new Promise(() => {}), timeout_ms: 20 });
+check('a check that never answers can be tried again', update_busy(), false);
 
 await check_updates({ check: async () => release });
 await reopen_settings();
 check('the sidebar says there is an update', find_test_id('sidebar-update') != null);
-check('settings offers it first', painted().indexOf('Version 0.2.0 is available') < painted().indexOf('Language model'));
+const offered_at = painted().indexOf('Version 0.2.0 is available');
+check('settings offers it first', offered_at !== -1 && offered_at < painted().indexOf('Language model'));
 check('with its release notes', painted().includes('a thing worth restarting for'));
 push('/');
 await wait();
@@ -417,4 +420,4 @@ check('the startup check can be turned off', app.settings.get('updates.auto'), f
 console.log('screenshot:', screenshot(join(tmpdir(), 'strata-smoke.png')));
 
 app.close();
-finish('smoke', 97);
+finish('smoke', 98);

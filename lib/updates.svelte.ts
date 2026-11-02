@@ -34,6 +34,11 @@ export const running_version = () => app_info()?.version ?? null;
 
 export const update_busy = () => updates.phase === 'checking' || updates.phase === 'downloading' || updates.phase === 'installing';
 
+// A check that never answers would hold the phase at `checking`, which disables the button that
+// could retry it. Raced in check_updates rather than passed as check_for_update's `fetch`, since
+// the Update it returns downloads the archive through that same `fetch`.
+const CHECK_TIMEOUT_MS = 30_000;
+
 let started = false;
 
 /** Once per process, since a hot remount calls this again. */
@@ -54,12 +59,20 @@ export function start_updates(app: App) {
 	void check_updates();
 }
 
-export async function check_updates({ manual = false, check = check_for_update }: { manual?: boolean; check?: () => Promise<Update | null> } = {}) {
+export async function check_updates({
+	manual = false,
+	check = check_for_update,
+	timeout_ms = CHECK_TIMEOUT_MS
+}: { manual?: boolean; check?: () => Promise<Update | null>; timeout_ms?: number } = {}) {
 	if (update_busy()) return;
 	updates.phase = 'checking';
 	updates.error = null;
+	let timer: ReturnType<typeof setTimeout> | undefined;
+	const timed_out = new Promise<never>((_, reject) => {
+		timer = setTimeout(() => reject(new Error('the update check timed out')), timeout_ms);
+	});
 	try {
-		updates.update = await check();
+		updates.update = await Promise.race([check(), timed_out]);
 		updates.phase = updates.update ? 'available' : 'current';
 	} catch (err) {
 		updates.phase = updates.update ? 'available' : 'idle';
@@ -67,6 +80,8 @@ export async function check_updates({ manual = false, check = check_for_update }
 		// so nobody needs to hear about a check they did not ask for.
 		if (manual) updates.error = (err as Error).message;
 		else warn(`update check failed: ${(err as Error).message}`);
+	} finally {
+		clearTimeout(timer);
 	}
 }
 
