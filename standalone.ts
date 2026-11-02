@@ -5,7 +5,10 @@ import { updated_from, wait_for_previous_instance } from 'gpuix-svelte/update';
 import App from './App.svelte';
 import { create_app } from './lib/app.ts';
 import { startup_failed } from './lib/dialogs.ts';
+import { prepare_runtime, verify_runtime } from './lib/runtime.ts';
 import { WINDOW } from './lib/window.ts';
+// build.ts writes this before it compiles: the ML runtime on Windows and Linux, empty on macOS.
+import ml_runtime from './dist/ml-runtime.zip' with { type: 'file' };
 
 // After a self-update, the instance that installed this one is still running. This call tells it
 // the new version started, which makes it exit, then waits for that. Called any later (render()
@@ -14,6 +17,9 @@ import { WINDOW } from './lib/window.ts';
 // rolls the update back. The cost: a version that fails in create_app() has already reported, so
 // it stays installed, and startup_failed is what the person sees instead of a rollback.
 wait_for_previous_instance();
+
+await prepare_runtime(ml_runtime);
+if (process.argv.includes('--verify-runtime')) process.exit(await verify_runtime());
 
 const app = await create_app().catch((err) => startup_failed(err, updated_from()));
 

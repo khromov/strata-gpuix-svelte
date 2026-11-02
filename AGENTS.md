@@ -25,7 +25,7 @@ bun run test         # test/brain.ts, then test/smoke.ts; no models, no network
 bun run typecheck    # tsc, then svelte-check against GPUI's element types
 bun run ml:doctor    # loads all three models under Bun and runs one inference each; the first
                      # run downloads ~380 MB into .data/models
-bun run build        # dist/Strata.app (macOS only); --archive adds the zip and update fragment
+bun run build        # the app for this platform, in dist/; --archive adds the zip and update fragment
 bun run import-hn    # pours the Hacker News front page into the real brain (scrape smoke test)
 bun run seed-load    # [count] [--fresh]: a copy of the brain plus 5000 generated items in
                      # .data/load; open it with GPUIX_BRAIN_DIR=.data/load. Downloads stay
@@ -93,10 +93,10 @@ fake data and a stub worker — screenshots), `START=/settings`, `THEME=light|da
   since a parent's `:hover` colour never reaches an `<svg>`.
 - A built app updates itself (`lib/updates.svelte.ts` over `gpuix-svelte/update`): at startup it
   reads `update.json` from the latest GitHub release (not with `OFFLINE=1` or the setting off), the
-  sidebar and Settings → Updates offer what it finds, and installing swaps the whole `.app` and
-  restarts it. `standalone.ts` calls `wait_for_previous_instance()` before `create_app()`, so two
+  sidebar and Settings → Updates offer what it finds, and installing swaps the app (the whole `.app`
+  on macOS, the executable on Windows and Linux) and restarts it. `standalone.ts` calls `wait_for_previous_instance()` before `create_app()`, so two
   instances never share the database. `.github/workflows/release.yml` publishes: release-please cuts
-  the version from conventional commits (`feat:`, `fix:`), macOS builds, `update.json` comes last.
+  the version from conventional commits (`feat:`, `fix:`), every platform builds, `update.json` comes last.
   docs/internals.md has the steps and secrets. A checkout has no manifest, so a check is a no-op.
 - Shared state lives in `.svelte.ts` modules (route, theme, UI state). They are deliberately one
   instance per process, so they survive a hot remount, and editing one needs a restart.
@@ -146,18 +146,24 @@ Whisper/CLIP, and the worker's orphan watchdog.
 
 ## Building
 
-`bun run build` runs `build.ts`: `build()` from `gpuix-svelte/build` compiles `standalone.ts` and
-makes `dist/Strata.app`, then `build.ts` adds the microphone usage string, the workers, their
-`node_modules` and the recorder shim, and signs. macOS only, and it needs `ml:install` first.
-`--archive` also writes `dist/strata-<version>-darwin-arm64.zip` and `dist/update-darwin-arm64.json`
-for `gpuix-svelte update manifest`; the version is package.json's, which release-please bumps.
+`bun run build` runs `build.ts`, on the platform it is building for, and needs `ml:install` first:
+`build()` from `gpuix-svelte/build` compiles `standalone.ts` into `dist/Strata.app` on macOS,
+`dist/strata.exe` on Windows or `dist/strata` on Linux. `--archive` also writes
+`dist/strata-<version>-<platform>.zip` and `dist/update-<platform>.json` for `gpuix-svelte update
+manifest`; the version is package.json's, which release-please bumps. On macOS `build.ts` then adds
+the microphone usage string, the workers, their `node_modules` and the recorder shim, and signs.
+On Windows and Linux the updater swaps a single executable, so `build.ts` zips the workers and their
+`node_modules` to `dist/ml-runtime.zip`, which `standalone.ts` embeds (empty on macOS), and
+`lib/runtime.ts` unpacks it to `<data dir>/runtime/<version>-<size>/` on first launch.
+`strata --verify-runtime` starts the real ML worker from a built app, with no model and no window,
+and exits; the release workflow runs it on every platform.
 `build()` signs before its `beforeArchive` hook runs and without the microphone entitlement, so
 `build.ts` keeps `CODESIGN_IDENTITY` from it and does the signing in that hook. `build()` takes no
 plugins either, which is why `lib/mp3.ts` imports the decoder by path. transformers.js can't be compiled into a Bun binary
-(huggingface/transformers.js#1672), so the worker ships as source with its `node_modules` in
-`Contents/Resources` and the app runs it on its own embedded Bun (`BUN_BE_BUN=1`). onnxruntime-node
-ships every platform's prebuilt runtime, so the copy is pruned to the host's. The compiled app keeps
-its data in `~/Library/Application Support/Strata`. `CODESIGN_IDENTITY` signs with the hardened
+(huggingface/transformers.js#1672), so the worker ships as source with its `node_modules` and the app
+runs it on its own embedded Bun (`BUN_BE_BUN=1`). onnxruntime-node ships every platform's prebuilt
+runtime, so the copy is pruned to the host's, and types, sourcemaps and docs are dropped. The compiled
+app keeps its data in the OS's application data directory. `CODESIGN_IDENTITY` signs with the hardened
 runtime and `NOTARY_PROFILE` (`xcrun notarytool store-credentials <profile>` once), or on CI
 `APPLE_ID`, `APPLE_PASSWORD` and `APPLE_TEAM_ID`, then notarizes and staples. `standalone.ts` mounts
 `App.svelte` with `render` and a static import, since a binary has no source to hot-reload; keep its

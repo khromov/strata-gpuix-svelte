@@ -8,11 +8,13 @@ if (!process.versions.bun) {
   process.exit(1);
 }
 
-import { existsSync, mkdtempSync } from "node:fs";
+import AdmZip from "adm-zip";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { basename, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { find_ranges } from "gpuix-svelte";
+import { unpack_runtime } from "../lib/runtime.ts";
 import { parse_appearance } from "../lib/appearance.ts";
 import { create_app } from "../lib/app.ts";
 import { cited_sources } from "../lib/ask.ts";
@@ -1491,4 +1493,41 @@ if (recorder) {
   check("still idle after stop", rec.isRecording(), false);
 }
 
-finish("brain", recorder ? 277 : 272);
+// The ML runtime Windows and Linux embed. Which build runs is the key, and it appears whole or not at all.
+{
+  const zipped = (entries: Record<string, string>) => {
+    const zip = new AdmZip();
+    for (const [name, body] of Object.entries(entries)) zip.addFile(name, Buffer.from(body));
+    return new Uint8Array(zip.toBuffer());
+  };
+  const root = mkdtempSync(join(tmpdir(), "strata-runtime-"));
+  const runtime = zipped({ "ml/worker.js": "first", "ml/node_modules/x/index.js": "dep" });
+
+  const first = unpack_runtime(runtime, root, "1.0.0-1");
+  check("the runtime unpacks where it says", first, join(root, "1.0.0-1"));
+  check("with its worker", readFileSync(join(first, "ml/worker.js"), "utf8"), "first");
+  check("and its dependencies", existsSync(join(first, "ml/node_modules/x/index.js")));
+
+  writeFileSync(join(first, "ml/worker.js"), "untouched");
+  unpack_runtime(runtime, root, "1.0.0-1");
+  check("an unpacked build is left alone", readFileSync(join(first, "ml/worker.js"), "utf8"), "untouched");
+
+  mkdirSync(join(root, ".unpack-abandoned"));
+  const second = unpack_runtime(zipped({ "ml/worker.js": "second" }), root, "1.0.1-2");
+  check("a new build gets its own runtime", readFileSync(join(second, "ml/worker.js"), "utf8"), "second");
+  check("and the old one, and any abandoned unpack, go", readdirSync(root), ["1.0.1-2"]);
+
+  const throws = (zip: Uint8Array, key: string) => {
+    try {
+      unpack_runtime(zip, root, key);
+      return false;
+    } catch {
+      return true;
+    }
+  };
+  check("a damaged runtime fails", throws(new Uint8Array([1, 2, 3]), "1.0.2-3"));
+  check("so does one with no worker", throws(zipped({ "ml/other.js": "x" }), "1.0.3-4"));
+  check("and neither leaves anything or costs the working build", readdirSync(root), ["1.0.1-2"]);
+}
+
+finish("brain", recorder ? 286 : 281);

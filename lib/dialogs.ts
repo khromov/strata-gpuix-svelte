@@ -1,3 +1,4 @@
+import { dlopen, ptr } from 'bun:ffi';
 import { track } from './lifecycle.ts';
 import { error } from './log.ts';
 import { open_url } from './shell.ts';
@@ -105,6 +106,19 @@ async function run(cmd: string[]) {
 
 const RELEASES = 'https://github.com/khromov/strata-gpuix-svelte/releases';
 
+/** A Windows app has no console, and a Linux one started from the desktop shows none. */
+function show_error(title: string, message: string) {
+	if (process.platform === 'win32') {
+		const wide = (text: string) => Buffer.from(`${text}\0`, 'utf16le');
+		const user32 = dlopen('user32.dll', { MessageBoxW: { args: ['ptr', 'ptr', 'ptr', 'u32'], returns: 'i32' } });
+		const MB_ICONERROR = 0x10;
+		user32.symbols.MessageBoxW(null, ptr(wide(message)), ptr(wide(title)), MB_ICONERROR);
+		return;
+	}
+	if (Bun.which('zenity')) Bun.spawnSync(['zenity', '--error', '--no-markup', `--title=${title}`, `--text=${message}`]);
+	else if (Bun.which('kdialog')) Bun.spawnSync(['kdialog', '--title', title, '--error', message]);
+}
+
 /**
  * create_app() failed in a built app, which has no window yet and no terminal, so without this it
  * would just disappear. After an update this is the one way out: the old version has already
@@ -124,6 +138,12 @@ export function startup_failed(err: unknown, updated_from: string | null): never
 		];
 		const { stdout } = Bun.spawnSync(['osascript', ...lines.flatMap((line) => ['-e', line]), message]);
 		if (stdout.toString().trim() === 'Open releases page') open_url(RELEASES);
+	} else {
+		try {
+			show_error('Strata could not start', `${message}\n\n${RELEASES}`);
+		} catch (dialog_err) {
+			error('could not show the startup error:', dialog_err);
+		}
 	}
 	process.exit(1);
 }

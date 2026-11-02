@@ -80,34 +80,48 @@ download progress and memory use.
 
 ## Your data
 
-Everything lives in one file, `strata.sqlite`, inside the `.data` directory (or
-`~/Library/Application Support/Strata` for the built macOS app). Images, thumbnails and
-recordings are stored inside it, so copying that one file copies your whole brain. The `cache`
-directory beside it is disposable and rebuilds itself.
+Everything lives in one file, `strata.sqlite`, inside the `.data` directory, or for the built app
+in `~/Library/Application Support/Strata`, `%APPDATA%\Strata` or `~/.local/share/strata`. Images,
+thumbnails and recordings are stored inside it, so copying that one file copies your whole brain. The
+`cache` directory beside it is disposable and rebuilds itself, and so is `runtime` on Windows and Linux.
 
 An API key entered in Settings is stored in plain text in that file. Set `GPUIX_BRAIN_LLM_KEY`
 instead if you would rather it never touches disk.
 
 ## Updates
 
-The built macOS app checks GitHub for a newer release when it starts: one request for a small JSON
+The built app checks GitHub for a newer release when it starts: one request for a small JSON
 file, with nothing about you or your data in it. If there is a newer version, a button appears
 above the status pill and Settings → Updates shows what changed. Install and restart downloads
 about 100 MB, checks it, replaces the app and reopens it. Your data lives outside the app, so it
 stays where it is.
 
-Turn the check off in Settings, or set `GPUIX_BRAIN_OFFLINE=1`. A copy opened straight from the
-download has to be moved to Applications before it can replace itself. A checkout has nothing to
+Turn the check off in Settings, or set `GPUIX_BRAIN_OFFLINE=1`. On macOS, a copy opened straight from
+the download has to be moved to Applications before it can replace itself. A checkout has nothing to
 update; use `git pull`.
 
-## Building the macOS app
+## Downloads and platforms
+
+[Releases](https://github.com/khromov/strata-gpuix-svelte/releases) have a zip for macOS (Apple
+Silicon), Windows (x64 and arm64) and Linux (x64). Each holds the app, and each copy updates itself.
+
+- **Windows.** The app isn't code-signed yet, so SmartScreen warns on first run. There is no file
+  picker, so you type a path to add an image or audio file.
+- **Linux.** It needs `libxcb`, `libxkbcommon` and `libxkbcommon-x11`, which desktops have. There is no
+  voice recording or pasting of images, adding files needs `zenity` or `kdialog`, and playback needs
+  `paplay`, `ffplay` or `aplay`.
+
+The first launch of each version on Windows and Linux unpacks the on-device model dependencies into
+the data directory.
+
+## Building
 
 ```bash
-bun run build   # dist/Strata.app, with the worker and its dependencies inside
+bun run build   # the app for this platform, in dist/, with the worker and its dependencies
 ```
 
-Set `CODESIGN_IDENTITY` and `NOTARY_PROFILE` to sign and notarize it. The bundle is about
-270 MB. [docs/internals.md](docs/internals.md#the-macos-app) explains how it is put together, and
+On macOS, set `CODESIGN_IDENTITY` and `NOTARY_PROFILE` to sign and notarize it.
+[docs/internals.md](docs/internals.md#the-macos-app) explains how it is put together, and
 [how a release is published](docs/internals.md#releases-and-updates).
 
 ## Configuration
