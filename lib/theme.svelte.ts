@@ -1,4 +1,4 @@
-import { forced, system_appearance, watch_appearance } from './appearance.ts';
+import { forced, system_appearance } from './appearance.ts';
 import type { Appearance } from './appearance.ts';
 import type { Settings } from './settings.ts';
 import { DARK, LIGHT, MD_THEME, READER_SIZE, READER_SIZES, reader_md } from './theme.ts';
@@ -18,7 +18,6 @@ export const reader_theme = () => reader_md(resolved(), reader.size);
 
 let persist: ((mode: ThemeMode) => void) | null = null;
 let persist_size: ((size: number) => void) | null = null;
-let stop: (() => void) | null = null;
 
 export function bind_theme(app: { settings: Pick<Settings, 'get' | 'set'> }) {
 	theme.mode = forced() ?? app.settings.get('theme.mode') ?? 'system';
@@ -39,14 +38,4 @@ export function step_reader_size(by: 1 | -1) {
 export function set_mode(mode: ThemeMode) {
 	theme.mode = mode;
 	persist?.(mode);
-}
-
-/** Idempotent, so a hot remount does not start a second poll. */
-export function start_system_poll(): () => void {
-	if (!stop) {
-		stop = watch_appearance((mode) => {
-			theme.system = mode;
-		});
-	}
-	return () => {};
 }
