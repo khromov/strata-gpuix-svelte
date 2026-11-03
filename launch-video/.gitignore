@@ -4,3 +4,6 @@ out/
 .env
 .env.local
 *.log
+public/shots/
+public/music/
+public/photos/
