@@ -1,6 +1,7 @@
-import { interpolateColors, spring, useCurrentFrame } from 'remotion';
+import { interpolateColors, useCurrentFrame } from 'remotion';
 import { LIGHT } from '../../../lib/theme';
-import { Crop, Ring, Rule, Sheet, Slit, flip, lerp, ramp, shot } from '../kit';
+import { Crop, Rule, Sheet, Slit, Veil, flip, lerp, ramp, shot } from '../kit';
+import { Mark, MARK_HIGH } from '../Mark';
 import { Strata } from '../Strata';
 
 /** The mark the app puts on a match, sampled from a capture. */
@@ -8,13 +9,16 @@ const HIGHLIGHT = '#e4ceaa';
 const CARD_SHADOW = '0 8px 24px rgba(42, 37, 31, 0.1)';
 const FIELD_RADIUS = '33px 0 0 33px';
 const CARD_RADIUS = '30px 0 0 30px';
-const MEANING_TYPING = Array.from({ length: 9 }, (_, i) => 1 + i * 3);
 
-/** Real lines of search_keyword/0004, each placed so its Elgol highlight sits on axis x 1152.5. */
-const STRIPS: Array<{ y: number; x: number; rect: [number, number, number, number]; land: number }> = [
-	{ y: 280, x: 888, rect: [472, 194, 106, 24], land: 418 },
-	{ y: 470, x: 897.5, rect: [709, 306, 279, 24], land: 425 },
-	{ y: 660, x: 1098.5, rect: [803, 438, 201, 24], land: 432 }
+/**
+ * Real lines of search_keyword/0004, each placed so its Elgol highlight sits on axis x 1152.5.
+ * `veils` are the words around Elgol, in the crop's own pixels (Elgol: logical 544.5-575.5,
+ * 778.5-812.5 and 805.5-837).
+ */
+const STRIPS: Array<{ y: number; x: number; rect: [number, number, number, number]; land: number; veils: Array<[number, number, number, number]> }> = [
+	{ y: 280, x: 888, rect: [472, 194, 106, 24], land: 447, veils: [[0, 0, 215, 72]] },
+	{ y: 470, x: 897.5, rect: [709, 306, 279, 24], land: 451, veils: [[0, 0, 206, 72], [312, 0, 525, 72]] },
+	{ y: 660, x: 1098.5, rect: [803, 438, 201, 24], land: 455, veils: [[105, 0, 498, 72]] }
 ];
 const STRIP_LEFT = 885;
 
@@ -24,27 +28,26 @@ const STRIP_LEFT = 885;
  * page's own start keeps the field and the query still across the swap.
  */
 function field_capture(frame: number): { src: string; left: number } {
-	if (frame < 375) return { src: shot('search_meaning_typing', flip(frame, 367, 375, MEANING_TYPING)), left: 442 };
-	if (frame < 404) return { src: shot('search_meaning', 4), left: 490 };
-	if (frame < 413) return { src: shot('search_keyword_typing', flip(frame, 404, 413, 5)), left: 442 };
+	if (frame < 397) return { src: shot('search_meaning_typing', flip(frame, 377, 397, 26)), left: 442 };
+	if (frame < 432) return { src: shot('search_meaning', 4), left: 490 };
+	if (frame < 441) return { src: shot('search_keyword_typing', flip(frame, 432, 441, 5)), left: 442 };
 	return { src: shot('search_keyword', 4), left: 490 };
 }
 
+/** One clause per proof: "by keyword," rises when its proof starts, and the read line turns accent. */
 const Words: React.FC<{ frame: number }> = ({ frame }) => {
-	const meaning = interpolateColors(frame, [404, 410], [LIGHT.ink, LIGHT.accent]);
-	const keyword = interpolateColors(frame, [404, 410], [LIGHT.accent, LIGHT.ink]);
-	const picture = interpolateColors(frame, [432, 438], [LIGHT.accent, LIGHT.ink]);
-	const slide = ramp(frame, 404, 8);
+	const meaning = interpolateColors(frame, [432, 438], [LIGHT.ink, LIGHT.accent]);
+	const slide = ramp(frame, 432, 8);
 	return (
 		<>
 			{frame >= 375 ? (
 				<div
 					style={{
 						position: 'absolute',
-						left: 208,
-						top: lerp(226, 366, slide),
-						width: lerp(509, 505, slide) * ramp(frame, 375, 8),
-						height: 110,
+						left: 205,
+						top: lerp(216, 356, slide),
+						width: lerp(518, 513, slide) * ramp(frame, 375, 8),
+						height: 126,
 						borderRadius: 10,
 						backgroundColor: HIGHLIGHT
 					}}
@@ -52,38 +55,33 @@ const Words: React.FC<{ frame: number }> = ({ frame }) => {
 			) : null}
 			<Slit text="Search" x={67} baseline={172} size={120} color={LIGHT.ink} from={366} />
 			<Slit text="by meaning," x={63} baseline={312} size={120} color={meaning} from={368} />
-			<Slit text="by keyword," x={63} baseline={452} size={120} color={keyword} from={370} />
-			<Slit text="and by what is" x={68} baseline={592} size={120} color={picture} from={372} />
-			<Slit text="in a picture." x={64} baseline={712} size={120} color={picture} from={375} />
+			<Slit text="by keyword," x={63} baseline={452} size={120} color={LIGHT.ink} from={432} />
 		</>
 	);
 };
 
+/** "bread that rises overnight" finds "Sourdough": the title and the loaf stay sharp, the rest of the card is veiled. */
 const MeaningProof: React.FC<{ frame: number }> = ({ frame }) => {
-	if (frame < 375 || frame >= 410) return null;
-	const card = (from: number) => {
-		const shown = ramp(frame, from, 10);
-		return { opacity: shown, transform: `translateY(${(1 - shown) * 28}px)` };
-	};
-	const drop = ramp(frame, 404, 6);
+	if (frame < 404 || frame >= 438) return null;
+	const shown = ramp(frame, 404, 10);
+	const drop = ramp(frame, 432, 6);
+	const src = shot('search_meaning', 4);
 	return (
 		<div style={{ position: 'absolute', inset: 0, opacity: 1 - drop, transform: `translateY(${drop * 40}px)` }}>
-			<Crop src={shot('search_meaning', 4)} rect={[268, 134, 314, 122]} s={3} x={980} y={254} radius={CARD_RADIUS} shadow={CARD_SHADOW} style={card(375)} />
-			<Crop src={shot('search_meaning', 4)} rect={[268, 265.5, 314, 122]} s={3} x={980} y={650} radius={CARD_RADIUS} shadow={CARD_SHADOW} style={card(378)} />
-			{/* The spec's rects are the rings' outer edges; Ring takes the stroke's centre line. */}
-			<Ring x={1373} y={509} width={204} height={72} radius={20} color={LIGHT.accent} from={390} />
-			<Ring x={1388} y={906} width={210} height={72} radius={20} color={LIGHT.accent} from={390} />
+			<Crop src={src} rect={[268, 134, 314, 122]} s={3} x={980} y={254} radius={CARD_RADIUS} shadow={CARD_SHADOW} style={{ opacity: shown, transform: `translateY(${(1 - shown) * 28}px)` }}>
+				<Veil src={src} rect={[268, 134, 314, 122]} s={3} box={[252, 120, 690, 213]} color={LIGHT.surface} />
+			</Crop>
 		</div>
 	);
 };
 
 const KeywordProof: React.FC<{ frame: number }> = ({ frame }) => {
-	if (frame < 408) return null;
-	const pop = spring({ frame: frame - 432, fps: 30, config: { damping: 13, stiffness: 170 } });
+	if (frame < 436) return null;
+	const src = shot('search_keyword', 4);
 	return (
 		<>
-			<Rule x1={1152.5} y1={202} x2={1152.5} y2={850} color={LIGHT.accent} from={410} dur={26} strokeWidth={4} dots={false} />
-			{STRIPS.map(({ y, x, rect, land }) => (
+			<Rule x1={1152.5} y1={202} x2={1152.5} y2={756} color={LIGHT.accent} from={437} dur={18} strokeWidth={4} dots={false} />
+			{STRIPS.map(({ y, x, rect, land, veils }) => (
 				<div
 					key={y}
 					style={{
@@ -96,21 +94,25 @@ const KeywordProof: React.FC<{ frame: number }> = ({ frame }) => {
 						transform: `translateX(${(1 - ramp(frame, land - 10, 10)) * (1920 - STRIP_LEFT)}px)`
 					}}
 				>
-					<Crop src={shot('search_keyword', 4)} rect={rect} s={3} x={x - STRIP_LEFT} y={12} />
+					<Crop src={src} rect={rect} s={3} x={x - STRIP_LEFT} y={12}>
+						{veils.map((box) => (
+							<Veil key={box[0]} src={src} rect={rect} s={3} box={box} color={LIGHT.surface} />
+						))}
+					</Crop>
 				</div>
 			))}
-			{frame >= 432 ? <Crop src={shot('search_keyword', 4)} rect={[401, 353, 61, 20]} s={3} x={1061} y={850} radius={15} style={{ transform: `scale(${0.9 + 0.1 * pop})` }} /> : null}
 		</>
 	);
 };
 
 /**
- * "Search by meaning, by keyword, and by what is in a picture." beside its proof. The field stops
- * at 447, where Mosaic picks up the same crop and glides it away.
+ * "Search by meaning, by keyword," one clause per proof; the trailing comma hands the third way,
+ * the picture, to the mosaic. The field stops at 461, where Mosaic picks up the same crop and
+ * glides it away.
  */
 export const Search: React.FC = () => {
 	const frame = useCurrentFrame();
-	const risen = ramp(frame, 368, 8);
+	const risen = ramp(frame, 375, 8);
 	const { src, left } = field_capture(frame);
 	return (
 		<Sheet color={LIGHT.accentSoft} from={361} dur={10}>
@@ -123,7 +125,9 @@ export const Search: React.FC = () => {
 			<Words frame={frame} />
 			<MeaningProof frame={frame} />
 			<KeywordProof frame={frame} />
-			{frame < 447 ? <Crop src={src} rect={[left, 8.5, 314, 46]} s={3} x={980} y={64} radius={FIELD_RADIUS} style={{ opacity: risen, transform: `translateY(${(1 - risen) * 24}px)` }} /> : null}
+			{frame < 461 ? <Crop src={src} rect={[left, 8.5, 314, 46]} s={3} x={980} y={64} radius={FIELD_RADIUS} style={{ opacity: risen, transform: `translateY(${(1 - risen) * 24}px)` }} /> : null}
+			{/* The mark rides in on the page: the sheet's wave clips it until it has passed. */}
+			<Mark baseline={MARK_HIGH} color={LIGHT.inkMuted} />
 		</Sheet>
 	);
 };

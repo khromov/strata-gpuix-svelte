@@ -28,13 +28,15 @@ interface HookChip {
 }
 
 const CHIPS: HookChip[] = [
-	{ text: 'New Recording 47', half: 'top', at: 12, cx: 1660, cy: 110, tilt: 3, lit: [61, 75] },
+	{ text: 'New Recording 47', half: 'top', at: 12, cx: 1648, cy: 110, tilt: 3, lit: [61, 75] },
 	{ text: 'Untitled note', half: 'bottom', at: 22, cx: 1560, cy: 690, tilt: 2 },
 	{ text: 'IMG_4721.jpg', half: 'top', at: 33, cx: 1640, cy: 290, tilt: -4, lit: [90] },
-	{ text: 'final_v3_FINAL.png', half: 'bottom', at: 40, cx: 286, cy: 850, tilt: 3, lit: [75, 90] },
-	{ text: 'tab 84 of 112', half: 'top', at: 47, cx: 1690, cy: 470, tilt: -3 },
-	{ text: 'bookmarks / misc / misc 2', half: 'bottom', at: 54, cx: 940, cy: 838, tilt: -1.5 },
-	{ text: 'Screenshot 2026-09-14 at 11.02.37.png', half: 'bottom', at: 61, cx: 1890, cy: 862, tilt: -2 }
+	{ text: 'final_v3_FINAL.png', half: 'bottom', at: 40, cx: 300, cy: 850, tilt: 3, lit: [75, 90] },
+	{ text: 'tab 84 of 112', half: 'top', at: 47, cx: 1680, cy: 470, tilt: -3 },
+	// About 34 px clear of final_v3's border, and its pop overshoot half what it was over '.png'.
+	{ text: 'bookmarks / misc / misc 2', half: 'bottom', at: 54, cx: 962, cy: 846, tilt: -1.5 },
+	// Its bleed is deliberate; 1902 keeps its pop's peak (67-71) off the bookmarks chip's '2'.
+	{ text: 'Screenshot 2026-09-14 at 11.02.37.png', half: 'bottom', at: 61, cx: 1902, cy: 862, tilt: -2 }
 ];
 
 const CRACK_AT = 90;

@@ -18,16 +18,16 @@ export const Opening: React.FC = () => {
 
 	// The cover: window and name share one slow scale around the frame's centre.
 	const grow = lerp(1, 1.008, clamp01((frame - 126) / 35));
-	const coverS = 1.02 * grow;
-	const coverX = 960 + (307 - 960) * grow;
-	const coverY = 540 + (36 + 260 * (1 - landed) - 540) * grow;
+	const coverS = 0.85 * grow;
+	const coverX = 960 + (416 - 960) * grow;
+	const coverY = 540 + (54 + 260 * (1 - landed) - 540) * grow;
 
 	// The push: from wherever the cover ended to the column at s 3.
 	const push = ramp(frame, 161, 14);
 	const s = lerp(coverS, 3, push);
 	const x = lerp(coverX, -732, push);
 	const bump = frame >= 204 ? 6 * (1 - ramp(frame, 204, 6)) : 0;
-	const y = lerp(coverY, -28, push) + bump;
+	const y = lerp(coverY, -4, push) + bump;
 
 	// In logical pixels: what the clip has hidden so far, the sidebar and the header.
 	const clipX = 246 * push;
@@ -46,12 +46,12 @@ export const Opening: React.FC = () => {
 				<div style={{ ...pane, boxShadow: `0 ${24 / s}px ${60 / s}px rgba(0, 0, 0, ${0.28 * (1 - push)})` }} />
 			</div>
 			<AbsoluteFill style={{ transform: `scale(${grow})`, transformOrigin: '960px 540px' }}>
-				<Slit text="In Strata." x={290} baseline={1024} size={321} color={LIGHT.bg} from={118} />
+				<Slit text="In Strata." x={401} baseline={954} size={268} color={LIGHT.bg} from={118} lip={0.4} />
 			</AbsoluteFill>
 			{/* After the name, so the name rises from behind the sediment on its way up. */}
 			<Strata bands={[{ color: LIGHT.ochre, height: 30, rise: landed }]} />
 			<Sheet color={LIGHT.bg} from={161} dur={14}>
-				<Slit text="Pour something in." x={60} baseline={168} size={150} color={LIGHT.ink} from={175} />
+				<Slit text="Add anything." x={69} baseline={172} size={150} color={LIGHT.ink} from={175} />
 			</Sheet>
 			<div style={camera}>
 				<div style={{ ...pane, overflow: 'hidden' }}>

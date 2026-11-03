@@ -8,6 +8,7 @@ import { EndCard } from './scenes/EndCard';
 import { Hook } from './scenes/Hook';
 import { Kinds } from './scenes/Kinds';
 import { Local } from './scenes/Local';
+import { DarkMark, LightMark } from './Mark';
 import { Mosaic } from './scenes/Mosaic';
 import { Opening } from './scenes/Opening';
 import { Search } from './scenes/Search';
@@ -27,11 +28,15 @@ const LAYERS: Array<{ from: number; to: number; Scene: React.FC }> = [
 	{ from: 104, to: 228, Scene: Opening },
 	{ from: 218, to: 285, Scene: Anything },
 	{ from: 275, to: 371, Scene: Kinds },
-	{ from: 361, to: 455, Scene: Search },
-	{ from: 447, to: 518, Scene: Mosaic },
+	// The mark, low: above the opening, Anything and Kinds. Search's rising sheet covers it at 364.
+	{ from: 190, to: 371, Scene: LightMark },
+	{ from: 361, to: 469, Scene: Search },
+	{ from: 461, to: 518, Scene: Mosaic },
 	{ from: 504, to: 570, Scene: Cow },
 	{ from: 561, to: 789, Scene: DarkAct },
 	{ from: 789, to: 858, Scene: Local },
+	// The mark, high: from the frame the wipe has cleared the corner (x 1921 at 569), under the end card's rising cover.
+	{ from: 569, to: 858, Scene: DarkMark },
 	{ from: 847, to: 944, Scene: EndCard },
 	{ from: 0, to: 112, Scene: Hook }
 ];

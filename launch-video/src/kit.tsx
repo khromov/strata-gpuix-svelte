@@ -59,6 +59,18 @@ export const Crop: React.FC<CropProps> = ({ src, rect: [lx, ly, lw, lh], s, x, y
 	</div>
 );
 
+/**
+ * Presentation only: a span of a crop's own capture, blurred and faded into the capture's
+ * background, so it reads as texture instead of asking to be read. A child of that Crop, with the
+ * same `src`, `rect` and `s`; `box` is in the crop's own pixels. Never backdrop-filter: inside a
+ * scaled, faded container Chrome draws those glyphs mirrored.
+ */
+export const Veil: React.FC<{ src: string; rect: [number, number, number, number]; s: number; box: [number, number, number, number]; color: string; blur?: number; alpha?: number }> = ({ src, rect: [lx, ly], s, box: [x, y, w, h], color, blur = 5, alpha = 0.38 }) => (
+	<div style={{ position: 'absolute', left: x, top: y, width: w, height: h, overflow: 'hidden', backgroundColor: color }}>
+		<Img src={src} style={{ position: 'absolute', left: -lx * s - x, top: -ly * s - y, width: 1280 * s, height: 720 * s, maxWidth: 'none', filter: `blur(${blur}px)`, opacity: alpha }} />
+	</div>
+);
+
 export interface TypeProps {
 	text: string;
 	x?: number;
@@ -209,7 +221,7 @@ export const Chip: React.FC<{ text: string; cx: number; cy: number; tilt: number
 			top: cy,
 			transform: `translate(-50%, -50%) rotate(${tilt}deg) scale(${pop})`,
 			opacity: Math.min(1, pop * 4),
-			padding: '12px 24px',
+			padding: '14px 28px',
 			borderRadius: 14,
 			borderWidth: 2,
 			borderStyle: 'solid',

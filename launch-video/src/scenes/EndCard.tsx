@@ -33,13 +33,13 @@ const Wordmark: React.FC = () => {
 /** The pill rises whole, through a slit the size of the pill. */
 const Download: React.FC = () => {
 	const frame = useCurrentFrame();
-	const height = 90;
+	const height = 98;
 	return (
-		<div style={{ position: 'absolute', left: 72, top: 590, height, overflow: 'hidden' }}>
+		<div style={{ position: 'absolute', left: 72, top: 629, height, overflow: 'hidden' }}>
 			<div
 				style={{
 					transform: `translateY(${(1 - ramp(frame, 875, 8)) * height * 1.05}px)`,
-					padding: '16px 38px',
+					padding: '20px 44px',
 					borderRadius: 16,
 					fontFamily: 'IBM Plex Sans',
 					fontSize: 46,
@@ -72,9 +72,9 @@ export const EndCard: React.FC = () => {
 				<Strata
 					bands={[
 						{ color: LIGHT.accentDeep, height: 84, rise: up(5) },
-						{ color: LIGHT.ochre, height: 34, rise: up(7) },
-						{ color: LIGHT.borderHover, height: 36, rise: up(9) },
-						{ color: DARK.well, height: 34, rise: up(11) },
+						{ color: DARK.ochre, height: 34, rise: up(7) },
+						{ color: DARK.teal, height: 36, rise: up(9) },
+						{ color: DARK.tealSoft, height: 34, rise: up(11) },
 						{ color: DARK.bg, height: 1180 * ramp(frame, 847, 11, smoothstep), rise: 1 }
 					]}
 				/>
@@ -84,8 +84,8 @@ export const EndCard: React.FC = () => {
 			<Img src={staticFile('icon.svg')} style={{ position: 'absolute', left: 28, top: 121, width: 451, height: 451, opacity: clamp01((mark - 0.1) * 5), transform: `scale(${0.6 + mark * 0.4})` }} />
 			<Wordmark />
 			<Download />
-			{/* The kit's baseline formula is Plex's: Lilex would land 2 px high, so 754 is what puts this line's ink on 752. */}
-			<Slit text="github.com/khromov/strata-gpuix-svelte" x={72} baseline={754} size={44} color={DARK.ink} weight={500} ls={0} font="Lilex" from={889} />
+			{/* The kit's baseline formula is Plex's: Lilex would land 2 px high, so 803 is what puts this line's ink on 801. */}
+			<Slit text="github.com/khromov/strata-gpuix-svelte" x={72} baseline={803} size={44} color={DARK.ink} weight={500} ls={0} font="Lilex" from={889} />
 			<Type text="Dream Relic - Time is a Limited Allowance" x={72} baseline={1056} size={26} color={LIGHT.bg} weight={500} ls={0} style={{ opacity: 0.85 * ramp(frame, 875, 8) }} />
 		</>
 	);
