@@ -1,18 +1,21 @@
 /**
- * Strata → dist/Strata.app. gpuix-svelte's build() compiles standalone.ts and makes the .app with
- * its icon and plist; this adds what only Strata needs, before anything is signed.
- * transformers.js cannot be compiled into a Bun binary (huggingface/transformers.js#1672:
- * onnxruntime's dylib and sharp's addon are not embedded), and it never has to be: the models run
- * in a child process, so the worker ships as source with its node_modules in Contents/Resources,
- * and the app runs it on its own embedded Bun (BUN_BE_BUN=1).
+ * Strata → the app for this platform, in dist/: Strata.app on macOS, strata.exe on Windows, strata
+ * on Linux. gpuix-svelte's build() compiles standalone.ts and packages it; this adds what only
+ * Strata needs. transformers.js cannot be compiled into a Bun binary
+ * (huggingface/transformers.js#1672: onnxruntime's dylib and sharp's addon are not embedded), and it
+ * never has to be: the models run in a child process, so the worker ships as source with its
+ * node_modules, and the app runs it on its own embedded Bun (BUN_BE_BUN=1).
+ *
+ * On macOS they go in Contents/Resources. On Windows and Linux the updater swaps a single
+ * executable, so they go inside it as one zip, which lib/runtime.ts unpacks on first launch.
  *
  * `--archive` also writes the zip to distribute and the fragment `gpuix-svelte update manifest`
- * merges, which .github/workflows/release.yml uploads. macOS only: the updater swaps a single
- * executable on Windows and Linux, and that cannot carry Resources.
+ * merges, which .github/workflows/release.yml uploads.
  */
 
+import AdmZip from 'adm-zip';
 import { spawnSync } from 'node:child_process';
-import { cpSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
+import { cpSync, existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { join, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -20,13 +23,10 @@ if (!process.versions.bun) {
 	console.error('[build] needs Bun — `bun run build` runs `bun build.ts`');
 	process.exit(1);
 }
-if (process.platform !== 'darwin') {
-	console.error(`[build] Strata's build makes a macOS .app (AVFoundation recorder, Metal); nothing to build on ${process.platform}`);
-	process.exit(1);
-}
 
 const root = fileURLToPath(new URL('./', import.meta.url));
 const dist = join(root, 'dist');
+const macos = process.platform === 'darwin';
 const archive = process.argv.includes('--archive');
 const identity = process.env.CODESIGN_IDENTITY;
 // A keychain profile on a developer's machine; an Apple ID on CI, where there is no keychain profile.
@@ -73,32 +73,53 @@ const ENTITLEMENTS = `<?xml version="1.0" encoding="UTF-8"?>
 </plist>
 `;
 
-// Imported after the guards: a static import would hoist `bun` above them.
+// Imported after the guard: a static import would hoist `bun` above it.
 const { build } = await import('gpuix-svelte/build');
-const { CLANG_ARGS } = await import('./lib/recorder.ts');
 
-const result = await build({ entry: join(root, 'standalone.ts'), outdir: dist, archive, beforeArchive: ({ output }) => complete(output) });
-if (!archive) await complete(result.output);
+const stage = join(dist, '.ml-stage');
+const payload = join(dist, 'ml-runtime.zip');
+rmSync(stage, { recursive: true, force: true });
+mkdirSync(join(stage, 'ml'), { recursive: true });
+await stage_ml(join(stage, 'ml'));
+
+// standalone.ts embeds this file whatever it holds, since a static import can't depend on the platform.
+if (macos) {
+	writeFileSync(payload, '');
+} else {
+	const zip = new AdmZip();
+	zip.addLocalFolder(join(stage, 'ml'), 'ml');
+	zip.writeZip(payload);
+	console.log(`[build] the ML runtime: ${mb(dir_size(stage))} MB, ${mb(statSync(payload).size)} MB zipped, embedded in the executable`);
+}
+
+const result = await build({ entry: join(root, 'standalone.ts'), outdir: dist, archive, ...(macos && { beforeArchive: ({ output }: { output: string }) => complete(output) }) });
+if (macos && !archive) await complete(result.output);
+
+rmSync(stage, { recursive: true, force: true });
+rmSync(payload, { force: true });
+
+/** Each worker bundled to one file (the lib/ modules it shares inlined), its real node_modules beside it: onnxruntime and sharp load from there as usual. */
+async function stage_ml(dir: string) {
+	await bundle_worker('worker', dir);
+	await bundle_worker('llm-worker', dir);
+	copy_file('ml/package.json', join(dir, 'package.json'));
+	console.log('[build] copying the ML dependencies (a few hundred MB)');
+	// Dereferenced: the update archive refuses symlinks, and node_modules/.bin has some.
+	cpSync(join(root, 'ml/node_modules'), join(dir, 'node_modules'), { recursive: true, dereference: true });
+	prune_foreign_runtimes(join(dir, 'node_modules'));
+	prune_wasm_backend(join(dir, 'node_modules'));
+	prune_unread_files(join(dir, 'node_modules'));
+}
 
 async function complete(bundle: string) {
 	const plist = join(bundle, 'Contents', 'Info.plist');
 	writeFileSync(plist, readFileSync(plist, 'utf8').replace('</dict>', `\t<key>NSMicrophoneUsageDescription</key>\n\t<string>${MICROPHONE_USAGE}</string>\n</dict>`));
 
 	const resources = join(bundle, 'Contents', 'Resources');
-	mkdirSync(join(resources, 'ml'), { recursive: true });
 	mkdirSync(join(resources, 'native'), { recursive: true });
+	renameSync(join(stage, 'ml'), join(resources, 'ml'));
 
-	// Each worker is bundled to one file (the lib/ modules it shares inlined) and keeps its
-	// real node_modules beside it: onnxruntime and sharp load from there as usual.
-	await bundle_worker('worker', resources);
-	await bundle_worker('llm-worker', resources);
-	copy_file('ml/package.json', join(resources, 'ml', 'package.json'));
-	console.log('[build] copying the ML dependencies (a few hundred MB)');
-	// Dereferenced: the update archive refuses symlinks, and node_modules/.bin has some.
-	cpSync(join(root, 'ml/node_modules'), join(resources, 'ml', 'node_modules'), { recursive: true, dereference: true });
-	prune_foreign_runtimes(join(resources, 'ml', 'node_modules'));
-	prune_wasm_backend(join(resources, 'ml', 'node_modules'));
-
+	const { CLANG_ARGS } = await import('./lib/recorder.ts');
 	run('clang', [...CLANG_ARGS, '-o', join(resources, 'native', 'recorder-shim.dylib'), join(root, 'native/recorder-shim.m')]);
 
 	console.log(`[build] ${relative(root, bundle)} (${mb(dir_size(bundle))} MB)`);
@@ -118,7 +139,7 @@ async function complete(bundle: string) {
 	}
 }
 
-async function bundle_worker(name: string, resources: string) {
+async function bundle_worker(name: string, dir: string) {
 	const worker = await Bun.build({
 		entrypoints: [join(root, `ml/${name}.ts`)],
 		target: 'bun',
@@ -130,7 +151,7 @@ async function bundle_worker(name: string, resources: string) {
 		for (const message of worker.logs) console.error(message);
 		process.exit(1);
 	}
-	writeFileSync(join(resources, 'ml', `${name}.js`), await worker.outputs[0].text());
+	writeFileSync(join(dir, `${name}.js`), await worker.outputs[0].text());
 }
 
 function copy_file(from: string, to: string) {
@@ -142,7 +163,7 @@ function mb(bytes: number) {
 }
 
 // onnxruntime-node's tarball carries every platform's prebuilt runtime — win32 alone is
-// 124 MB — and the .app only ever dlopen's the host's.
+// 124 MB — and the app only ever dlopen's the host's.
 function prune_foreign_runtimes(modules: string) {
 	const bin = join(modules, 'onnxruntime-node/bin/napi-v6');
 	if (!existsSync(bin)) return;
@@ -174,6 +195,23 @@ function prune_wasm_backend(modules: string) {
 		rmSync(join(dist, name), { force: true });
 	}
 	if (drop.length) console.log(`[build] dropped ${drop.length} onnxruntime-web wasm/map file(s), ${mb(freed)} MB`);
+}
+
+// Types, sourcemaps and docs are half the files and nothing reads them at runtime, and on Windows
+// and Linux every file is one more to unpack, and on Windows one more for the antivirus to scan.
+function prune_unread_files(modules: string) {
+	let count = 0;
+	(function walk(dir: string) {
+		for (const entry of readdirSync(dir, { withFileTypes: true })) {
+			const full = join(dir, entry.name);
+			if (entry.isDirectory()) walk(full);
+			else if (/\.(d\.[cm]?ts|map|md)$/i.test(entry.name)) {
+				rmSync(full, { force: true });
+				count++;
+			}
+		}
+	})(modules);
+	console.log(`[build] dropped ${count} type, sourcemap and doc files`);
 }
 
 function dir_size(path: string) {

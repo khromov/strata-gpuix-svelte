@@ -23,42 +23,15 @@ export const forced = (): Appearance | null => {
 	return mode === 'dark' || mode === 'light' ? mode : null;
 };
 
-/** Synchronous, for the first paint only. */
+/** Read once at startup, so a change to the system's setting shows on the next launch. */
 export function system_appearance(): Appearance {
 	const cmd = command();
 	if (forced()) return forced()!;
 	if (!cmd) return 'dark';
 	try {
-		const result = Bun.spawnSync(cmd, { stdin: 'ignore', stdout: 'pipe', stderr: 'ignore' });
+		const result = Bun.spawnSync(cmd, { stdin: 'ignore', stdout: 'pipe', stderr: 'ignore', windowsHide: true });
 		return parse_appearance(process.platform, result.exitCode, result.stdout.toString());
 	} catch {
 		return 'dark';
 	}
-}
-
-export async function system_appearance_async(): Promise<Appearance> {
-	const cmd = command();
-	if (forced()) return forced()!;
-	if (!cmd) return 'dark';
-	try {
-		const proc = Bun.spawn(cmd, { stdin: 'ignore', stdout: 'pipe', stderr: 'ignore' });
-		const [stdout, code] = await Promise.all([new Response(proc.stdout).text(), proc.exited]);
-		return parse_appearance(process.platform, code, stdout);
-	} catch {
-		return 'dark';
-	}
-}
-
-/** `cb` runs on every change, and once at start. */
-export function watch_appearance(cb: (mode: Appearance) => void, intervalMs = 3000): () => void {
-	let last: Appearance | null = null;
-	const probe = async () => {
-		const mode = await system_appearance_async();
-		if (mode === last) return;
-		last = mode;
-		cb(mode);
-	};
-	probe();
-	const timer = setInterval(probe, intervalMs);
-	return () => clearInterval(timer);
 }

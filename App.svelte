@@ -10,7 +10,7 @@
 	import { bind_app } from './lib/data.svelte.ts';
 	import { bind_feeds } from './lib/feed-filter.svelte.ts';
 	import { back, push, route, type RouteEntry } from './lib/router.svelte.ts';
-	import { bind_theme, start_system_poll, tokens } from './lib/theme.svelte.ts';
+	import { bind_theme, tokens } from './lib/theme.svelte.ts';
 	import { focus, ui } from './lib/ui.svelte.ts';
 	import { start_updates } from './lib/updates.svelte.ts';
 	import RouteView from './RouteView.svelte';
@@ -41,7 +41,6 @@
 		{ path: '*', load: () => import('./routes/NotFound.svelte'), title: 'Not found' }
 	];
 
-	$effect(() => start_system_poll());
 	// The palette is the only theme: every `var(--…)` in the style block below resolves against it.
 	$effect(() => set_css_vars(tokens()));
 	$effect(() => {

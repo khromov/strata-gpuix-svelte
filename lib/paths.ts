@@ -13,9 +13,13 @@ export interface DataDirs {
 
 let resources: string | null | undefined;
 
+/** Bun serves a compiled app's entry from a virtual filesystem: `/$bunfs/`, `B:\\~BUN\\` on Windows. */
+export const is_compiled = () => /^\/\$bunfs\/|[\\/]~BUN[\\/]/.test(Bun.main);
+
 /**
  * A compiled .app keeps the ML worker, its dependencies and the recorder shim in
- * Contents/Resources; from a checkout there is no such directory and this is null.
+ * Contents/Resources; on Windows and Linux lib/runtime.ts unpacks them and says where through
+ * use_resources. From a checkout there is no such directory and this is null.
  */
 export function resources_dir(): string | null {
 	if (resources !== undefined) return resources;
@@ -25,14 +29,18 @@ export function resources_dir(): string | null {
 	return resources;
 }
 
-function app_data_dir() {
+export function use_resources(dir: string) {
+	resources = dir;
+}
+
+export function app_data_dir() {
 	if (process.platform === 'darwin') return join(homedir(), 'Library', 'Application Support', 'Strata');
 	if (process.platform === 'win32') return join(process.env.APPDATA ?? join(homedir(), 'AppData', 'Roaming'), 'Strata');
 	return join(process.env.XDG_DATA_HOME ?? join(homedir(), '.local', 'share'), 'strata');
 }
 
-/** Inside the checkout's example directory, or the OS's application data directory for a compiled app. */
-export const default_root = () => (resources_dir() ? app_data_dir() : fileURLToPath(new URL('../.data', import.meta.url)));
+/** Inside the checkout, or the OS's application data directory for a compiled app. */
+export const default_root = () => (is_compiled() ? app_data_dir() : fileURLToPath(new URL('../.data', import.meta.url)));
 
 export function data_dirs(root: string = process.env.GPUIX_BRAIN_DIR || default_root()): DataDirs {
 	const dirs: DataDirs = {

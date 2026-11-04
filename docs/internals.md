@@ -10,7 +10,8 @@ contributors and coding agents.
 ```
   app.ts                 Bun guard → create_app() → render_hot(App.svelte, { props: { app } })
   standalone.ts          the compiled entry: static imports, render() instead of render_hot()
-  build.ts               standalone.ts → dist/Strata.app (bun run build); --archive for a release
+  build.ts               standalone.ts → the app for this platform in dist/ (bun run build);
+                         --archive for a release
   vendor/                gpuix-svelte's main, packed, until 0.5.0 is on npm
   App.svelte             root layout, window-level shortcuts, the palette → set_css_vars, route table
   RouteView.svelte       resolves the route and lazy-loads the page component
@@ -21,7 +22,8 @@ contributors and coding agents.
                          whoever needs a dialog, ContextMenu one mounted once by App; scrolling
                          is the package's Scroller
   lib/                   the data layer (plain TS) and the UI state (.svelte.ts runes modules);
-                         menus.ts is what each right click offers, updates.svelte.ts the updater
+                         menus.ts is what each right click offers, updates.svelte.ts the updater,
+                         runtime.ts unpacks the ML files on Windows and Linux
   lib/feeds/             the poller (poll.ts, croner) over a source registry; rss.ts reads RSS 2.0,
                          RDF and Atom, and another kind is a module plus an entry in SOURCES
   ml/worker.ts           the child process that owns the models; ml/doctor.ts is the spike
@@ -111,12 +113,26 @@ recorder shim is compiled at build time into `Contents/Resources/native`. Data l
 exists and without the microphone entitlement. The bundle is ~270 MB, most of it the Bun runtime
 and the onnxruntime and sharp prebuilds, and its zip ~100 MB.
 
+## Windows and Linux
+
+On Windows and Linux the updater swaps one executable, so the worker and its `node_modules` have to
+travel inside it. They can't simply be compiled in: Bun extracts a `.node` addon alone to a temp
+directory under a random name, and onnxruntime's and sharp's addons need libraries beside them
+(`libonnxruntime`, `onnxruntime.dll` and `DirectML.dll`, `libvips`). So `build.ts` zips the whole
+directory to `dist/ml-runtime.zip`, `standalone.ts` embeds that file, and `lib/runtime.ts` unpacks it
+on the first launch of each build, to `<data dir>/runtime/<version>-<size>/`, which appears whole or
+not at all, and deletes other builds' copies. The worker then runs from there as it does from
+`Contents/Resources`. If it can't be unpacked, the app opens without ML and Settings says why. The
+window waits for the unpacking, of about 1,400 files: 1 s on Linux and 3 to 4 s on Windows on GitHub's
+runners, and an antivirus on a real machine may add to that.
+
 ## Releases and updates
 
 `.github/workflows/release.yml` runs on every push to `main`. release-please keeps a PR open that
 bumps `package.json` and the changelog from the conventional commits (`feat:`, `fix:`) since the
-last release; merging it tags the release. Then macOS runs `bun build.ts --archive` and uploads
-the zip, and a last job writes `update.json` with the release notes and uploads that. Until it
+last release; merging it tags the release. Then each platform (macOS, Windows x64 and arm64, Linux
+x64) runs `bun build.ts --archive`, starts its ML worker from the result with `--verify-runtime`, and
+uploads the zip, and a last job writes `update.json` with the release notes and uploads that. Until it
 finishes the new release's manifest is a 404, which a startup check only logs.
 
 The app asks for
@@ -124,14 +140,13 @@ The app asks for
 redirects to the newest release's copy, so no API or token is involved. A newer version is offered
 in the sidebar and in Settings → Updates (`lib/updates.svelte.ts`). `install()` checks the zip's
 hash and size, extracts it beside the app, checks the bundle's identifier and version, swaps the
-`.app` and starts the new one, which reports back before the old one exits; a new version that does
+app and starts the new one, which reports back before the old one exits; a new version that does
 not report within ten seconds is rolled back. Extracting blocks the frame loop for a few seconds.
 The new instance reports and waits for the old one at the top of `standalone.ts`, before
 `create_app()`, so they don't share the database or a worker unless the old one outlasts the ten
 seconds that wait allows. That means a rollback only covers a version that can't load at all: one that fails later, in
 `create_app()`, stays installed, and shows a dialog pointing at the releases page
-(`startup_failed` in `lib/dialogs.ts`). On Windows and Linux the updater swaps a single executable, which cannot carry the ML
-worker and its `node_modules`, so releases are macOS only.
+(`startup_failed` in `lib/dialogs.ts`).
 
 If a release's build fails, use Re-run failed jobs, which keeps the release job's output. Re-running
 every job runs release-please again, which has nothing new to create, so the build is skipped. If
@@ -155,7 +170,8 @@ To sign the manifest, also put the public key `keygen` prints in `standalone.ts`
 makes the release fail rather than ship a manifest the apps would refuse. Without a key the app
 trusts whoever can publish to the repository's releases, over HTTPS. Without the macOS secrets the
 app is unsigned, which does not affect updating but makes macOS block a first install until it is
-allowed under System Settings → Privacy & Security.
+allowed under System Settings → Privacy & Security. Windows builds are unsigned for now, so SmartScreen
+warns on first run; `build()`'s `beforeArchive` is where `signtool` would go.
 
 ### Setting up signing
 
@@ -218,7 +234,7 @@ Serve `dist/` and run the old app with `GPUIX_BRAIN_DIR` set to a scratch direct
 | file picker | `osascript … choose file` (macOS and Linux; on Windows you type a path) |
 | clipboard | `pbpaste`/`pbcopy` on macOS and `Get-Clipboard`/`Set-Clipboard` on Windows for text, `Bun.Image.fromClipboard()` for images |
 | audio playback | `afplay` on macOS, `paplay`/`ffplay`/`aplay` on Linux; on Windows the clip is decoded in-process and pushed to winmm's waveOut (`lib/player-win.ts`), since nothing ships with Windows that plays an MP3 from a command line without opening a window |
-| system dark mode | `defaults read -g AppleInterfaceStyle` on macOS, `gsettings` on Linux, a `reg query` on Windows; polled every 3 s |
+| system dark mode | `defaults read -g AppleInterfaceStyle` on macOS, `gsettings` on Linux, a `reg query` on Windows; read once at startup |
 | decoding audio | a hand-written WAV parser (`lib/wav.ts`) and mpg123 as WebAssembly for MP3 (`lib/mp3.ts`). WAV and MP3 are the two formats Strata imports, and both are handled in-process, so there is no ffmpeg to install |
 | readable text from a page | one synchronous `HTMLRewriter` pass (`lib/scrape.ts`) that scores candidate containers. lol-html keeps one `onEndTag` callback per element and the element handle is dead inside it; `scrape.ts` shows the way around |
 | AVIF / HEIC on screen | GPUI's image crate cannot decode them; `Bun.Image` (ImageIO) stores a WebP display copy beside the original |

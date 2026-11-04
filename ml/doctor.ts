@@ -4,6 +4,8 @@
  * Run with `bun run ml:doctor`; the first run downloads ~400 MB into .data/models.
  */
 
+import { fileURLToPath } from 'node:url';
+
 if (!process.versions.bun) {
 	console.error('[doctor] needs Bun — `bun run ml:doctor` runs `bun ml/doctor.ts`');
 	process.exit(1);
@@ -28,7 +30,7 @@ const {
 } = tf;
 console.log(`[doctor] transformers.js ${env.version} | WhisperTextStreamer: ${typeof tf.WhisperTextStreamer}`);
 
-env.cacheDir = process.env.GPUIX_BRAIN_MODELS_DIR ?? new URL('../.data/models/', import.meta.url).pathname;
+env.cacheDir = process.env.GPUIX_BRAIN_MODELS_DIR ?? fileURLToPath(new URL('../.data/models/', import.meta.url));
 env.allowLocalModels = false;
 console.log(`[doctor] cacheDir ${env.cacheDir}`);
 

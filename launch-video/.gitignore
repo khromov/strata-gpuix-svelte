@@ -1,0 +1,9 @@
+node_modules/
+out/
+.DS_Store
+.env
+.env.local
+*.log
+public/shots/
+public/music/
+public/photos/

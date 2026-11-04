@@ -22,6 +22,7 @@ import { create_media, derive_title, needs_display_copy } from './media.ts';
 import { DIMS, MlClient, type MlLike, type MlStatus } from './ml-client.ts';
 import { LocalStub, MlStub } from './ml-stub.ts';
 import { data_dirs, resources_dir } from './paths.ts';
+import { runtime_problem } from './runtime.ts';
 import { normalize_url } from './scrape.ts';
 import { create_search, type SearchOptions } from './search.ts';
 import { create_settings } from './settings.ts';
@@ -47,24 +48,26 @@ export interface AppOptions {
 	seed?: boolean;
 }
 
-// From a checkout the worker sits beside its node_modules in ml/; a compiled .app
-// carries both in Contents/Resources/ml, since transformers.js cannot live in the binary.
-const ML_DIR = resources_dir() ? join(resources_dir()!, 'ml') : fileURLToPath(new URL('../ml', import.meta.url));
-// The compiled app bundles the worker to `worker.js`; a checkout runs the source.
-const WORKER = join(ML_DIR, resources_dir() ? 'worker.js' : 'worker.ts');
-const LLM_WORKER = join(ML_DIR, resources_dir() ? 'llm-worker.js' : 'llm-worker.ts');
-const ML_INSTALLED = join(ML_DIR, 'node_modules', '@huggingface', 'transformers', 'package.json');
+// From a checkout the worker sits beside its node_modules in ml/; a compiled app carries both in
+// its resources directory, since transformers.js cannot live in the binary. Functions rather than
+// constants, because on Windows and Linux that directory is unpacked after this module loads.
+const ml_dir = () => {
+	const resources = resources_dir();
+	return resources ? join(resources, 'ml') : fileURLToPath(new URL('../ml', import.meta.url));
+};
+// The compiled app bundles each worker to one .js file; a checkout runs the source.
+const worker_path = (name: string) => join(ml_dir(), `${name}.${resources_dir() ? 'js' : 'ts'}`);
 
-export const ml_installed = () => existsSync(ML_INSTALLED);
+export const ml_installed = () => existsSync(join(ml_dir(), 'node_modules', '@huggingface', 'transformers', 'package.json'));
 
 export function default_ml({ models_dir, autoload = true, on_status }: { models_dir: string; autoload?: boolean; on_status?: (s: MlStatus) => void }): MlLike {
 	if (process.env.GPUIX_BRAIN_STUB === '1') return new MlStub({ on_status });
 	if (process.env.GPUIX_BRAIN_ML === 'off') return new MlStub({ available: false, reason: 'ML disabled by GPUIX_BRAIN_ML=off', on_status });
 	if (!ml_installed()) {
-		return new MlStub({ available: false, reason: 'ML dependencies not installed — run `bun run ml:install`', on_status });
+		return new MlStub({ available: false, reason: runtime_problem() ?? 'ML dependencies not installed — run `bun run ml:install`', on_status });
 	}
 	return new MlClient({
-		worker_path: WORKER,
+		worker_path: worker_path('worker'),
 		models_dir,
 		autoload,
 		on_status
@@ -74,7 +77,7 @@ export function default_ml({ models_dir, autoload = true, on_status }: { models_
 /** Gemma lives in the same ml/ package as the other models, so it is off (or stubbed) with them. */
 export function default_local({ ml, models_dir, on_status }: { ml: MlLike; models_dir: string; on_status?: (s: LocalStatus) => void }): LocalLike {
 	if (ml instanceof MlStub) return new LocalStub({ available: ml.available, reason: ml.reason, on_status });
-	return new LocalLlm({ worker_path: LLM_WORKER, models_dir, on_status });
+	return new LocalLlm({ worker_path: worker_path('llm-worker'), models_dir, on_status });
 }
 
 const date_label = () =>

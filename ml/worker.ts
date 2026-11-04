@@ -3,6 +3,7 @@
  * image files by path and returns Float32Arrays; the database is the parent's.
  */
 
+import { fileURLToPath } from 'node:url';
 import type { ModelName, ModelState, WorkerHandlers, WorkerJob, WorkerMessage, WorkerRequest } from '../lib/ml-client.ts';
 import type { Failure } from '../lib/types.ts';
 import { decode_wav } from '../lib/wav.ts';
@@ -44,7 +45,7 @@ const MODELS: Record<ModelName, string> = {
 const tf = await import('@huggingface/transformers');
 const { env, pipeline, AutoProcessor, AutoTokenizer, RawImage, CLIPVisionModelWithProjection, CLIPTextModelWithProjection, WhisperTextStreamer } = tf;
 
-env.cacheDir = process.env.GPUIX_BRAIN_MODELS_DIR || new URL('../.data/models/', import.meta.url).pathname;
+env.cacheDir = process.env.GPUIX_BRAIN_MODELS_DIR || fileURLToPath(new URL('../.data/models/', import.meta.url));
 env.allowLocalModels = false;
 env.allowRemoteModels = process.env.GPUIX_BRAIN_OFFLINE !== '1';
 env.logLevel = 40;

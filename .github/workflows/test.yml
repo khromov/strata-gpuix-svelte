@@ -13,9 +13,9 @@ jobs:
         os: [macos-15, ubuntu-latest, windows-latest]
     runs-on: ${{ matrix.os }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       # The gpuix-svelte bin is a Node script that starts Bun under --bun.
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: 26
       - uses: oven-sh/setup-bun@v2

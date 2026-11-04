@@ -6,6 +6,7 @@
  */
 
 import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import {
 	claim_gemma_lock,
 	GEMMA_BYTES,
@@ -32,7 +33,7 @@ const status = (state: ModelState, extra: { progress?: number | null; error?: st
 const tf = await import('@huggingface/transformers');
 const { env, AutoProcessor, Gemma4ForConditionalGeneration, TextStreamer, InterruptableStoppingCriteria, RawImage } = tf;
 
-env.cacheDir = process.env.GPUIX_BRAIN_MODELS_DIR || new URL('../.data/models/', import.meta.url).pathname;
+env.cacheDir = process.env.GPUIX_BRAIN_MODELS_DIR || fileURLToPath(new URL('../.data/models/', import.meta.url));
 env.allowLocalModels = false;
 env.allowRemoteModels = process.env.GPUIX_BRAIN_OFFLINE !== '1';
 env.logLevel = 40;

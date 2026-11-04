@@ -21,13 +21,15 @@
 		"bun": ">=1.4.3"
 	},
 	"dependencies": {
+		"adm-zip": "^0.6.1",
 		"croner": "^10.0.1",
-		"gpuix-svelte": "file:vendor/gpuix-svelte-0.4.1-f530fb7.tgz",
+		"gpuix-svelte": "file:vendor/gpuix-svelte-0.4.1-ba5cfb2.tgz",
 		"marked": "^18.0.11",
 		"mpg123-decoder": "^1.0.3",
 		"wasm-media-encoders": "^0.7.0"
 	},
 	"devDependencies": {
+		"@types/adm-zip": "^0.5.8",
 		"@types/bun": "^1.4.3",
 		"@types/node": "^26.4.1",
 		"svelte-check": "^4.7.6",

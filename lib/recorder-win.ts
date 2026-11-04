@@ -49,7 +49,7 @@ function read_consent_sync(): AuthStatus {
 	return parse_mic_consent(
 		...consent_keys().map((key) => {
 			try {
-				return Bun.spawnSync(['reg', 'query', key, '/v', 'Value'], { stdin: 'ignore', stdout: 'pipe', stderr: 'ignore' }).stdout.toString();
+				return Bun.spawnSync(['reg', 'query', key, '/v', 'Value'], { stdin: 'ignore', stdout: 'pipe', stderr: 'ignore', windowsHide: true }).stdout.toString();
 			} catch {
 				return '';
 			}
@@ -61,7 +61,7 @@ async function read_consent(): Promise<AuthStatus> {
 	const outputs = await Promise.all(
 		consent_keys().map(async (key) => {
 			try {
-				const proc = Bun.spawn(['reg', 'query', key, '/v', 'Value'], { stdin: 'ignore', stdout: 'pipe', stderr: 'ignore' });
+				const proc = Bun.spawn(['reg', 'query', key, '/v', 'Value'], { stdin: 'ignore', stdout: 'pipe', stderr: 'ignore', windowsHide: true });
 				const [stdout] = await Promise.all([new Response(proc.stdout).text(), proc.exited]);
 				return stdout;
 			} catch {
