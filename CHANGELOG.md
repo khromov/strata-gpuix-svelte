@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.1.0](https://github.com/khromov/strata-gpuix-svelte/compare/v1.0.1...v1.1.0) (2026-11-04)
+
+
+### Features
+
+* build improvements ([#6](https://github.com/khromov/strata-gpuix-svelte/issues/6)) ([d31101f](https://github.com/khromov/strata-gpuix-svelte/commit/d31101f13b1c70070c3378482e4be3d01fbce078))
+
 ## [1.0.1](https://github.com/khromov/strata-gpuix-svelte/compare/v1.0.0...v1.0.1) (2026-11-02)
 
 
