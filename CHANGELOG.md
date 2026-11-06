@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.1.1](https://github.com/khromov/strata-gpuix-svelte/compare/v1.1.0...v1.1.1) (2026-11-06)
+
+
+### Bug Fixes
+
+* install gpuix-svelte 0.5.0 from npm instead of a vendored build ([#8](https://github.com/khromov/strata-gpuix-svelte/issues/8)) ([dd91c04](https://github.com/khromov/strata-gpuix-svelte/commit/dd91c04e4f1ffceb8e9920c82863b962ee9e53fd))
+
 ## [1.1.0](https://github.com/khromov/strata-gpuix-svelte/compare/v1.0.1...v1.1.0) (2026-11-04)
 
 
