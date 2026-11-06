@@ -7,7 +7,7 @@
       "dependencies": {
         "adm-zip": "^0.6.1",
         "croner": "^10.0.1",
-        "gpuix-svelte": "file:vendor/gpuix-svelte-0.4.1-ba5cfb2.tgz",
+        "gpuix-svelte": "^0.5.0",
         "marked": "^18.0.11",
         "mpg123-decoder": "^1.0.3",
         "wasm-media-encoders": "^0.7.0",
@@ -86,7 +86,7 @@
 
     "fdir": ["fdir@6.5.0", "", { "peerDependencies": { "picomatch": "^3 || ^4" }, "optionalPeers": ["picomatch"] }, "sha512-tIbYtZbucOs0BRGqPJkshJUYdL+SDH7dVM8gjy+ERp3WAUjLEFJE+02kanyHtwjWOnwrKYBiwAmM0p4kLJAnXg=="],
 
-    "gpuix-svelte": ["gpuix-svelte@vendor/gpuix-svelte-0.4.1-ba5cfb2.tgz", { "dependencies": { "@gpuix/native": ">=0.11.0 <0.12.0", "acorn": "^8.19.0", "adm-zip": "^0.6.1", "svelte": ">=5.56.0" }, "bin": { "gpuix-svelte": "bin/gpuix-svelte.js" } }, "sha512-UogUH4wqKzh37Ivr78YbHyAiq762kVihX1x1TnZRqf72u6gobhr4dZW5+eaCzrLwYPd1551NA1X4Z3NnWJymDw=="],
+    "gpuix-svelte": ["gpuix-svelte@0.5.0", "", { "dependencies": { "@gpuix/native": ">=0.11.0 <0.12.0", "acorn": "^8.19.0", "adm-zip": "^0.6.1", "svelte": ">=5.56.0" }, "bin": { "gpuix-svelte": "bin/gpuix-svelte.js" } }, "sha512-OhE0Tt5Do8Xeoj+TsoeVGOUMr22/HdkjvQZgtR+QiVg0XTm6luKUS5yyP+ZmEHGyZubJyNp++L5Xxt4m4mr+bg=="],
 
     "is-reference": ["is-reference@3.0.3", "", { "dependencies": { "@types/estree": "^1.0.6" } }, "sha512-ixkJoqQvAP88E6wLydLGGqCJsrFUnqoH6HnaczB8XmDH1oaWU+xxdptvikTgaEhtZ53Ky6YXiBuUI2WXLMCwjw=="],
 

@@ -31,6 +31,7 @@ bun run seed-load    # [count] [--fresh]: a copy of the brain plus 5000 generate
                      # .data/load; open it with GPUIX_BRAIN_DIR=.data/load. Downloads stay
                      # in .data/seed-corpus, so later runs are offline
 bun run frames       # draw-time stats per route, against a copy of the data (see below)
+bun run vendor-gpuix # [ref]: gpuix-svelte from a git ref instead of npm (see Dependencies)
 ```
 
 After a change, run `bun run typecheck` and `bun run test`. To see what the window draws, run
@@ -200,17 +201,18 @@ call's source, so its values are string literals and the call takes no spread.
 ## Dependencies
 
 `gpuix-svelte` brings its own build of Svelte, the one with the custom renderer API, and resolves
-every `svelte` import to it. Keep `svelte` itself out of `package.json`.
+every `svelte` import to it. Keep `svelte` itself out of `package.json`. The updater
+(`gpuix-svelte/update`) and `build({ archive })` need 0.5.0 or later.
 
-For now it is vendored: `vendor/gpuix-svelte-0.4.1-ba5cfb2.tgz` is `node scripts/publish.ts pack` of
-gpuix-svelte's main at ba5cfb2 (its package.json still says 0.4.1), because `gpuix-svelte/update`
-and `build({ archive })` ship in 0.5.0 and Bun refuses main as a git dependency: its svelte is a
-`file:` tarball, which Bun allows only in the root project. Once 0.5.0 is on npm, set
-`"gpuix-svelte": "^0.5.0"`, delete `vendor/` and run `bun install`.
+To run on something from gpuix-svelte that is not on npm yet, `bun run vendor-gpuix [ref]`
+(`scripts/vendor-gpuix.ts`, default `main`) clones that ref, packs it with gpuix-svelte's own
+`scripts/publish.ts pack`, writes `vendor/gpuix-svelte-<version>-<sha>.tgz`, points `package.json`
+at it and runs `bun install`. A git dependency won't do, since gpuix-svelte's svelte is a `file:`
+tarball, which Bun allows only in the root project. Back on a release: set the `^x.y.z` range,
+delete `vendor/` and run `bun install`.
 
-The ML stack is a separate
-package in `ml/` with its own `bun.lock`; Bun blocks onnxruntime-node's postinstall, which only
-fetches CUDA binaries for Linux, and nothing here needs it.
+The ML stack is a separate package in `ml/` with its own `bun.lock`; Bun blocks onnxruntime-node's
+postinstall, which only fetches CUDA binaries for Linux, and nothing here needs it.
 
 `launch-video/` is another separate package (`bun install --cwd launch-video`; ~900 MB once Remotion
 has fetched its headless Chrome and cached a bundle): the Remotion scaffold from
