@@ -12,7 +12,6 @@ contributors and coding agents.
   standalone.ts          the compiled entry: static imports, render() instead of render_hot()
   build.ts               standalone.ts → the app for this platform in dist/ (bun run build);
                          --archive for a release
-  vendor/                gpuix-svelte's main, packed, until 0.5.0 is on npm
   App.svelte             root layout, window-level shortcuts, the palette → set_css_vars, route table
   RouteView.svelte       resolves the route and lazy-loads the page component
   routes/                Everything, Kind, Search, Item, Ask, Feeds, Settings, NotFound; Item renders a
@@ -35,6 +34,8 @@ contributors and coding agents.
   scripts/import-hn.ts   the Hacker News importer; frame-cost.ts prints GPUI draw times per route
                          (bun run frames), against a copy of the data; seed-load.ts fills a
                          load-test brain from Wikipedia, picsum.photos and `say`
+                         vendor-gpuix.ts packs gpuix-svelte from a git ref into vendor/ when the
+                         app needs something not yet on npm
   test/                  brain.ts (data + native, no models) and smoke.ts (headless UI)
   icon.svg / icon.png    the logo; the .app's icon is cut from the PNG
   .data/                 gitignored: strata.sqlite, cache/, models/, tmp/

@@ -15,7 +15,8 @@
 		"ml:doctor": "bun ml/doctor.ts",
 		"import-hn": "bun scripts/import-hn.ts",
 		"seed-load": "bun scripts/seed-load.ts",
-		"frames": "gpuix-svelte --bun scripts/frame-cost.ts"
+		"frames": "gpuix-svelte --bun scripts/frame-cost.ts",
+		"vendor-gpuix": "bun scripts/vendor-gpuix.ts"
 	},
 	"engines": {
 		"bun": ">=1.4.3"
@@ -23,7 +24,7 @@
 	"dependencies": {
 		"adm-zip": "^0.6.1",
 		"croner": "^10.0.1",
-		"gpuix-svelte": "file:vendor/gpuix-svelte-0.4.1-ba5cfb2.tgz",
+		"gpuix-svelte": "^0.5.0",
 		"marked": "^18.0.11",
 		"mpg123-decoder": "^1.0.3",
 		"wasm-media-encoders": "^0.7.0"
