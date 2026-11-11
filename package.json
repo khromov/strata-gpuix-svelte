@@ -5,17 +5,17 @@
 	"description": "Strata, a second brain in a native GPUI window: notes, links, images and voice memos, hybrid search and RAG chat, built with gpuix-svelte",
 	"type": "module",
 	"scripts": {
-		"start": "gpuix-svelte --bun app.ts",
-		"start:wayland": "DISPLAY= gpuix-svelte --bun app.ts",
-		"start:x11": "WAYLAND_DISPLAY= gpuix-svelte --bun app.ts",
-		"test": "gpuix-svelte --bun test/brain.ts && gpuix-svelte --bun test/smoke.ts",
+		"start": "bun node_modules/gpuix-svelte/bin/gpuix-svelte.js --bun app.ts",
+		"start:wayland": "DISPLAY= bun node_modules/gpuix-svelte/bin/gpuix-svelte.js --bun app.ts",
+		"start:x11": "WAYLAND_DISPLAY= bun node_modules/gpuix-svelte/bin/gpuix-svelte.js --bun app.ts",
+		"test": "bun node_modules/gpuix-svelte/bin/gpuix-svelte.js --bun test/brain.ts && bun node_modules/gpuix-svelte/bin/gpuix-svelte.js --bun test/smoke.ts",
 		"build": "bun build.ts",
 		"typecheck": "tsc --noEmit && svelte-check --diagnostic-sources js,svelte --fail-on-warnings",
 		"ml:install": "bun install --cwd ml",
 		"ml:doctor": "bun ml/doctor.ts",
 		"import-hn": "bun scripts/import-hn.ts",
 		"seed-load": "bun scripts/seed-load.ts",
-		"frames": "gpuix-svelte --bun scripts/frame-cost.ts",
+		"frames": "bun node_modules/gpuix-svelte/bin/gpuix-svelte.js --bun scripts/frame-cost.ts",
 		"vendor-gpuix": "bun scripts/vendor-gpuix.ts"
 	},
 	"engines": {

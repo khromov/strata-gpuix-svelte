@@ -45,6 +45,15 @@ twins, so every script that renders passes `--bun` to the gpuix-svelte bin. **Ne
 `render_hot` does its own in-process reload, and `--hot` re-evaluates Svelte's runtime so the old
 component belongs to a module instance the new one can't see.
 
+The scripts run the bin as `bun node_modules/gpuix-svelte/bin/gpuix-svelte.js` rather than by its
+name, which runs its `node` shebang: where Node is not installed, `bun run` runs that on a copy of
+Bun named `node`, which takes `--conditions` but resolves without them (oven-sh/bun#44611), so
+`svelte` loads its server build and the app fails with `custom_renderer_unavailable_on_server`.
+khromov/gpuix-svelte#77 fixes the bin; once a release has it, the scripts go back to
+`gpuix-svelte --bun`. Don't put `bun --conditions=… app.ts` in a script instead: on Windows `bun run`
+starts a script hidden, and a window the script's own process opens stays hidden. The bin spawns
+the app, which shows it.
+
 Env vars, all optional (`GPUIX_BRAIN_*`): `DIR` (data directory, default `.data`), `STUB=1` (seeded
 fake data and a stub worker — screenshots), `START=/settings`, `THEME=light|dark`, `ML=off`,
 `OFFLINE=1`, `RECORDER=0` (no microphone backend), `FEEDS=0`, `LLM_PROVIDER=local|openai`,

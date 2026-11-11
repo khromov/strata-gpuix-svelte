@@ -14,7 +14,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v7
-      # The gpuix-svelte bin is a Node script that starts Bun under --bun.
+      # tsc and svelte-check are Node scripts; the app and its tests run on Bun.
       - uses: actions/setup-node@v7
         with:
           node-version: 26
