@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.1.2](https://github.com/khromov/strata-gpuix-svelte/compare/v1.1.1...v1.1.2) (2026-11-12)
+
+
+### Bug Fixes
+
+* start and test without Node installed ([#10](https://github.com/khromov/strata-gpuix-svelte/issues/10)) ([539ce32](https://github.com/khromov/strata-gpuix-svelte/commit/539ce32ba2419324247913b6f86ae1cb81fb96ec))
+
 ## [1.1.1](https://github.com/khromov/strata-gpuix-svelte/compare/v1.1.0...v1.1.1) (2026-11-06)
 
 
