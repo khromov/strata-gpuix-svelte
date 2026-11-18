@@ -25,7 +25,8 @@
 			<Toggle label="Include feeds" checked={include_feeds()} onchange={set_include_feeds} testid="timeline-feeds" />
 		</div>
 	{/if}
-	<Scroller virtual estimate={110} pad="0 24px 24px 24px" testid="timeline">
+	<!-- A virtual Scroller's own 12px gutter holds GPUI's thumb, so 12 more lines the cards up with a plain one's 24. -->
+	<Scroller virtual estimate={110} pad="0 12px 24px 24px" testid="timeline">
 		{#each visible as item (item.id)}
 			<div class="row"><ItemCard {item} onopen={() => push(`/item/${item.id}`)} /></div>
 		{/each}

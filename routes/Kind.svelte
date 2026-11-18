@@ -23,7 +23,8 @@
 		<KindBadge {kind} />
 		<div class="count">{items.length} item{items.length === 1 ? '' : 's'}</div>
 	</div>
-	<Scroller virtual={kind !== 'image'} estimate={110} pad="0 24px 24px 24px" gap={14}>
+	<!-- The image grid is a plain Scroller; a virtual one keeps 12px of its right pad for GPUI's thumb. -->
+	<Scroller virtual={kind !== 'image'} estimate={110} pad={kind === 'image' ? '0 24px 24px 24px' : '0 12px 24px 24px'} gap={14}>
 		{#if items.length === 0}
 			<EmptyState title={EMPTY[kind]} />
 		{:else if kind === 'image'}
