@@ -118,7 +118,7 @@
 </script>
 
 {#snippet updates_section()}
-	<div class="section" testId="settings-updates">
+	<div class="page-row"><div class="section" testId="settings-updates">
 		<div class="heading">Updates</div>
 		{#if !version}
 			<div class="hint">Running from source, so there is nothing to update here. Built copies of Strata update themselves from its GitHub releases.</div>
@@ -160,17 +160,20 @@
 				<div class="status">Strata {version}{updates.phase === 'current' ? ' is up to date' : ''}</div>
 			</div>
 		{/if}
-	</div>
+	</div></div>
 {/snippet}
 
 <div class="route">
-	<Scroller pad="24px 28px 36px 28px" gap={24}>
+	<!-- Virtual, so a frame lays out only the sections in view: as one column the page took ~9 ms a frame, past a 120 Hz display's 8.3. -->
+	<Scroller virtual estimate={240} pad="0 16px 12px 28px" testid="settings">
+		<!-- A row, so the space above the first section scrolls away with it. -->
+		<div class="page-top"></div>
 		<!-- First when there is one, because the sidebar's button lands here. -->
 		{#if updates.update}
 			{@render updates_section()}
 		{/if}
 
-		<div class="section">
+		<div class="page-row"><div class="section">
 			<div class="heading">Language model</div>
 			<div class="setting">
 				<Segmented options={PROVIDERS} value={data.provider} onchange={choose_provider} />
@@ -213,17 +216,17 @@
 					{#if testing}<Spinner size={14} />{/if}
 				</div>
 			{/if}
-		</div>
+		</div></div>
 
-		<div class="section">
+		<div class="page-row"><div class="section">
 			<div class="heading">Appearance</div>
 			<!-- A column stretches its children; this one keeps the control as wide as its options. -->
 			<div class="setting">
 				<Segmented options={THEMES} value={theme.mode} onchange={set_mode} />
 			</div>
-		</div>
+		</div></div>
 
-		<div class="section">
+		<div class="page-row"><div class="section">
 			<div class="heading">On-device models</div>
 			{#if data.ml.error}
 				<div class="problem">{data.ml.error}</div>
@@ -254,9 +257,9 @@
 				<div class="status">Worker {data.ml.worker}{data.ml.memory ? ` · ${format_bytes(data.ml.memory.rss)}` : ''} · App {format_bytes(data.memory)}</div>
 				<Button label="Restart worker" icon="refresh" small onclick={() => app.ml.restart?.().catch((err) => toast(err.message, 'error'))} />
 			</div>
-		</div>
+		</div></div>
 
-		<div class="section">
+		<div class="page-row"><div class="section">
 			<div class="heading">Pipeline</div>
 			<div class="hint">
 				{#if outstanding > 0}
@@ -282,9 +285,9 @@
 				<Button label={data.stuck > 0 ? `Requeue ${data.stuck} unfinished` : 'Requeue unfinished'} icon="refresh" small disabled={data.stuck === 0} onclick={requeue} />
 				<Button label={data.counts.error > 0 ? `Retry ${data.counts.error} failed` : 'Retry failed'} icon="refresh" small disabled={data.counts.error === 0} onclick={retry_failed} />
 			</div>
-		</div>
+		</div></div>
 
-		<div class="section">
+		<div class="page-row"><div class="section">
 			<div class="heading">Feeds</div>
 			<Toggle label="Include feeds" checked={include_feeds()} onchange={set_include_feeds} testid="settings-feeds" />
 			<div class="setting">
@@ -295,14 +298,14 @@
 				<Button label={data.feeds.length ? `Manage ${data.feeds.length} feed${data.feeds.length === 1 ? '' : 's'}` : 'Add a feed'} icon="rss" small onclick={() => push('/feeds')} />
 				<div class="status">{data.counts.feeds} item{data.counts.feeds === 1 ? '' : 's'} from feeds</div>
 			</div>
-		</div>
+		</div></div>
 
-		<div class="section">
+		<div class="page-row"><div class="section">
 			<div class="heading">Transcription</div>
 			<Field label="Language" value={language} placeholder="auto-detect — or en, sv, de, …" onchange={(v) => { language = v; settings.set('stt.language', v.trim()); }} />
-		</div>
+		</div></div>
 
-		<div class="section">
+		<div class="page-row"><div class="section">
 			<div class="heading">Data</div>
 			<div class="path">{app.dirs.root}</div>
 			<div class="hint">{data.counts.total} items · {app.vectors.size} text vectors · {app.images.size} image vectors · {format_bytes(app.store.bytes_used())}</div>
@@ -313,7 +316,7 @@
 					<Modal title="Rebuild the index?" body="Every item is chunked and embedded again. Nothing is deleted." confirmLabel="Rebuild" onclose={rebuild} />
 				{/if}
 			</div>
-		</div>
+		</div></div>
 
 		{#if !updates.update}
 			{@render updates_section()}
@@ -323,6 +326,9 @@
 
 <style>
 	.route { display: flex; flex-direction: column; flex-grow: 1; min-height: 0; }
+	/* A virtual list neither stretches its rows nor spaces them, so each section sits in a full-width row with the gap under it. */
+	.page-top { height: 24px; }
+	.page-row { display: flex; flex-direction: column; width: 100%; padding-bottom: 24px; }
 	.section { display: flex; flex-direction: column; gap: 16px; max-width: 760px; padding: 22px 24px; border-radius: 14px; border-width: 1px; background-color: var(--surface); border-color: var(--border); }
 	.heading { font-size: 17px; line-height: 24px; font-weight: 600; }
 	.hint { font-size: 13px; line-height: 18px; color: var(--inkMuted); }

@@ -140,13 +140,18 @@ wheel events scroll the content column. `--keep` leaves the window open with the
 scrolling by hand. It is a thin script over gpuix-svelte's `debugFrameOverlay` render option,
 `reset_debug_overlay_stats()` and `debug_overlay_stats()`, plus native's
 `simulateScrollWheel(x, y, dx, dy)`, which `GpuixRenderer` and `TestGpuixRenderer` both expose.
+A reset clears the draw samples but not `frames`, which counts from startup, so the script
+subtracts; before 2026-11-18 its idle frames and fps grew with every route it had visited.
 Baselines on 2026-10-12 (native 0.10.0, 1180×780, scroll p90): the timeline ~2.2 ms a frame,
 settings ~6.1 ms, the longest item ~1.9 ms. On 2026-09-03 (native 0.7.0) they were ~4.6, ~7–9 and
 ~5 ms (the item route was ~18 ms with a 226-block page before its Scroller went virtual), and
 `/settings` blocked ~90 ms per simulated wheel event although its draw was ~9 ms. gpuix-svelte
 0.6.0's virtual `Scroller` stopped redrawing a JS thumb between wheel events, so a scroll draws
 ~25% fewer frames and p90 reads ~1–2 ms higher on the timeline and item routes at the same
-per-frame cost: compare p90 across that bump only together with the fps column.
+per-frame cost: compare p90 across that bump only together with the fps column. On 2026-11-18
+(native 0.11.0, gpuix-svelte 0.6.0) the timeline and Settings were ~5–6 ms and the longest item
+~6–7 ms; Settings as one plain column had been ~9 ms with frames up to ~20 ms, past a 120 Hz
+display's 8.3 ms, and juddered (#13) until it went virtual.
 
 ## Memory
 
@@ -200,9 +205,15 @@ call's source, so its values are string literals and the call takes no spread.
 - App-wide keyboard shortcuts: `on_window_key('keydown', handler)` from `gpuix-svelte`, returned
   from an `$effect` so it unsubscribes.
 - Scrolling content goes in `Scroller` (`gpuix-svelte/components/Scroller.svelte`), which draws the
-  scrollbar. A `virtual` one (0.6.0 on) keeps GPUI's own thumb in a 12px gutter inside its `pad`,
-  so its right pad is 12px where a plain one's is 24, or its rows come out 12px narrower than the
-  other pages'. Modals, menus and toasts go in `Portal` (`gpuix-svelte/components/Portal.svelte`),
+  scrollbar. A plain one lays out and paints all of its content on every frame, so a page much
+  taller than the window goes in a `virtual` one, one row per block or section (the timeline, the
+  item page, Settings); a virtual list neither stretches nor spaces its rows, so give each a
+  full-width wrapper with `padding-bottom`, and a section past the fold paints only once it is
+  scrolled to (in tests, `native.scrollToItem`). A `virtual` one (0.6.0 on) keeps GPUI's own thumb
+  in a 12px gutter inside its `pad`, so its right pad is 12px less than a plain one's, or its rows
+  come out 12px narrower than the other pages'. Its `pad` stays put while the rows scroll, so space
+  that should scroll away (Settings' top 24px) is a spacer row instead. Modals, menus and toasts go in `Portal`
+  (`gpuix-svelte/components/Portal.svelte`),
   which paints on top; hover tips and dropdowns that sit beside a trigger go in `Tooltip` and
   `Popover` from the same directory. `IconButton`'s `tip` is a `Tooltip`, coloured by the palette's
   `tooltip-surface` and `tooltip-ink`.
