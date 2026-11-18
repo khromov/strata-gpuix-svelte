@@ -59,6 +59,8 @@ for (const path of routes) {
 	push(path);
 	// A lazy route import, then the related-items query on an item page.
 	await sleep(1200);
+	// A reset clears the draw samples but not the frame count, which runs from startup, so frames are differences.
+	const loaded = debug_overlay_stats()!.frames;
 	reset_debug_overlay_stats();
 	await sleep(IDLE_MS);
 	const idle = debug_overlay_stats()!;
@@ -73,7 +75,7 @@ for (const path of routes) {
 	const elapsed = performance.now() - started;
 	const scroll = debug_overlay_stats()!;
 	const ms = (n?: number) => (n === undefined ? '-' : `${n.toFixed(1)} ms`);
-	rows.push([path, `${idle.frames}/${IDLE_MS / 1000}s`, ms(idle.maxMs), ms(scroll.p90Ms), ms(scroll.p99Ms), ms(scroll.maxMs), ((scroll.frames * 1000) / elapsed).toFixed(0)]);
+	rows.push([path, `${idle.frames - loaded}/${IDLE_MS / 1000}s`, ms(idle.maxMs), ms(scroll.p90Ms), ms(scroll.p99Ms), ms(scroll.maxMs), (((scroll.frames - idle.frames) * 1000) / elapsed).toFixed(0)]);
 }
 
 const widths = (rows[0] ?? []).map((_, col) => Math.max(...rows.map((row) => row[col]?.length ?? 0)));

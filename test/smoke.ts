@@ -371,8 +371,18 @@ check('settings carries the same switch', find_test_id('settings-feeds') != null
 // The tick is a filled box, so the palette's accent is what says the switch is on.
 check('and it carries what search just set', find_test_id('settings-feeds')?.children?.[0]?.style?.backgroundColor, DARK.accent);
 
+// Settings is a virtual list, so a section below the fold paints only once it is scrolled to.
+const show_updates = async () => {
+	const list = find_test_id('settings')!;
+	native.scrollToItem(list.id, list.children!.findIndex((row) => row.children?.some((c) => c.testId === 'settings-updates')));
+	await wait();
+};
+
 // Updates. A checkout has no manifest, so the startup check found nothing and went nowhere.
 check('a checkout has no update', updates.update, null);
+// Painting the whole page cost ~9 ms a frame and made Settings judder on a 120 Hz display (#13).
+check('settings paints only the sections in view', painted().includes('Running from source'), false);
+await show_updates();
 check('and settings says why', painted().includes('Running from source'));
 
 // From here this pretends to be a built app, with a fake Update: the real install swaps the running app.
@@ -406,12 +416,14 @@ const reopen_settings = async () => {
 
 await check_updates({ check: async () => null });
 await reopen_settings();
+await show_updates();
 check('a built app knows its version', painted().includes('Strata 0.1.0 is up to date'));
 
 await check_updates({ check: () => Promise.reject(new Error('manifest: 404')) });
 check('a startup check that fails bothers nobody', updates.error, null);
 await check_updates({ manual: true, check: () => Promise.reject(new Error('manifest: 404')) });
 await wait();
+await show_updates();
 check('a check you asked for says what went wrong', painted().includes('manifest: 404'));
 await check_updates({ check: () => new Promise(() => {}), timeout_ms: 20 });
 check('a check that never answers can be tried again', update_busy(), false);
@@ -446,4 +458,4 @@ check('the startup check can be turned off', app.settings.get('updates.auto'), f
 console.log('screenshot:', screenshot(join(tmpdir(), 'strata-smoke.png')));
 
 app.close();
-finish('smoke', 103);
+finish('smoke', 104);

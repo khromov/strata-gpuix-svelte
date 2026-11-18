@@ -109,7 +109,7 @@
 			<div>Unknown kind “{parsed.unknown[0]}” — try kind:note, kind:link, kind:image or kind:audio.</div>
 		</div>
 	{/if}
-	<Scroller virtual estimate={110} pad="0 24px 24px 24px" testid="results">
+	<Scroller virtual estimate={110} pad="0 12px 24px 24px" testid="results">
 		{#if !q}
 			<EmptyState icon="search" title="Search your brain" />
 		{:else if !loading && result.hits.length === 0}

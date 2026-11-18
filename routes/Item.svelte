@@ -186,7 +186,7 @@
 				></textarea>
 			</div>
 		{:else}
-			<Scroller virtual estimate={44} pad="0 24px 32px 24px" testid="item-body">
+			<Scroller virtual estimate={44} pad="0 12px 32px 24px" testid="item-body">
 				<div class="row header" onauxclick={show}>
 					<div class="meta">
 						<KindBadge kind={item.kind} />

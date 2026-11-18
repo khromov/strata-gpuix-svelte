@@ -45,14 +45,13 @@ twins, so every script that renders passes `--bun` to the gpuix-svelte bin. **Ne
 `render_hot` does its own in-process reload, and `--hot` re-evaluates Svelte's runtime so the old
 component belongs to a module instance the new one can't see.
 
-The scripts run the bin as `bun node_modules/gpuix-svelte/bin/gpuix-svelte.js` rather than by its
-name, which runs its `node` shebang: where Node is not installed, `bun run` runs that on a copy of
-Bun named `node`, which takes `--conditions` but resolves without them (oven-sh/bun#44611), so
-`svelte` loads its server build and the app fails with `custom_renderer_unavailable_on_server`.
-khromov/gpuix-svelte#77 fixes the bin; once a release has it, the scripts go back to
-`gpuix-svelte --bun`. Don't put `bun --conditions=… app.ts` in a script instead: on Windows `bun run`
-starts a script hidden, and a window the script's own process opens stays hidden. The bin spawns
-the app, which shows it.
+The scripts run the bin by name, which runs its `node` shebang: where Node is not installed, `bun run`
+runs that on a copy of Bun named `node`, which takes `--conditions` but resolves without them
+(oven-sh/bun#44611). Since gpuix-svelte 0.6.0 (khromov/gpuix-svelte#77) the bin notices and starts
+the app on the real `bun` beside that copy; before it, `svelte` loaded its server build and the app
+failed with `custom_renderer_unavailable_on_server`. Don't put `bun --conditions=… app.ts` in a
+script instead: on Windows `bun run` starts a script hidden, and a window the script's own process
+opens stays hidden. The bin spawns the app, which shows it.
 
 Env vars, all optional (`GPUIX_BRAIN_*`): `DIR` (data directory, default `.data`), `STUB=1` (seeded
 fake data and a stub worker — screenshots), `START=/settings`, `THEME=light|dark`, `ML=off`,
@@ -141,10 +140,18 @@ wheel events scroll the content column. `--keep` leaves the window open with the
 scrolling by hand. It is a thin script over gpuix-svelte's `debugFrameOverlay` render option,
 `reset_debug_overlay_stats()` and `debug_overlay_stats()`, plus native's
 `simulateScrollWheel(x, y, dx, dy)`, which `GpuixRenderer` and `TestGpuixRenderer` both expose.
+A reset clears the draw samples but not `frames`, which counts from startup, so the script
+subtracts; before 2026-11-18 its idle frames and fps grew with every route it had visited.
 Baselines on 2026-10-12 (native 0.10.0, 1180×780, scroll p90): the timeline ~2.2 ms a frame,
 settings ~6.1 ms, the longest item ~1.9 ms. On 2026-09-03 (native 0.7.0) they were ~4.6, ~7–9 and
 ~5 ms (the item route was ~18 ms with a 226-block page before its Scroller went virtual), and
-`/settings` blocked ~90 ms per simulated wheel event although its draw was ~9 ms.
+`/settings` blocked ~90 ms per simulated wheel event although its draw was ~9 ms. gpuix-svelte
+0.6.0's virtual `Scroller` stopped redrawing a JS thumb between wheel events, so a scroll draws
+~25% fewer frames and p90 reads ~1–2 ms higher on the timeline and item routes at the same
+per-frame cost: compare p90 across that bump only together with the fps column. On 2026-11-18
+(native 0.11.0, gpuix-svelte 0.6.0) the timeline and Settings were ~5–6 ms and the longest item
+~6–7 ms; Settings as one plain column had been ~9 ms with frames up to ~20 ms, past a 120 Hz
+display's 8.3 ms, and juddered (#13) until it went virtual.
 
 ## Memory
 
@@ -198,7 +205,15 @@ call's source, so its values are string literals and the call takes no spread.
 - App-wide keyboard shortcuts: `on_window_key('keydown', handler)` from `gpuix-svelte`, returned
   from an `$effect` so it unsubscribes.
 - Scrolling content goes in `Scroller` (`gpuix-svelte/components/Scroller.svelte`), which draws the
-  scrollbar; modals, menus and toasts go in `Portal` (`gpuix-svelte/components/Portal.svelte`),
+  scrollbar. A plain one lays out and paints all of its content on every frame, so a page much
+  taller than the window goes in a `virtual` one, one row per block or section (the timeline, the
+  item page, Settings); a virtual list neither stretches nor spaces its rows, so give each a
+  full-width wrapper with `padding-bottom`, and a section past the fold paints only once it is
+  scrolled to (in tests, `native.scrollToItem`). A `virtual` one (0.6.0 on) keeps GPUI's own thumb
+  in a 12px gutter inside its `pad`, so its right pad is 12px less than a plain one's, or its rows
+  come out 12px narrower than the other pages'. Its `pad` stays put while the rows scroll, so space
+  that should scroll away (Settings' top 24px) is a spacer row instead. Modals, menus and toasts go in `Portal`
+  (`gpuix-svelte/components/Portal.svelte`),
   which paints on top; hover tips and dropdowns that sit beside a trigger go in `Tooltip` and
   `Popover` from the same directory. `IconButton`'s `tip` is a `Tooltip`, coloured by the palette's
   `tooltip-surface` and `tooltip-ink`.
@@ -211,7 +226,8 @@ call's source, so its values are string literals and the call takes no spread.
 
 `gpuix-svelte` brings its own build of Svelte, the one with the custom renderer API, and resolves
 every `svelte` import to it. Keep `svelte` itself out of `package.json`. The updater
-(`gpuix-svelte/update`) and `build({ archive })` need 0.5.0 or later.
+(`gpuix-svelte/update`) and `build({ archive })` need 0.5.0 or later, and running the scripts
+without Node installed needs 0.6.0.
 
 To run on something from gpuix-svelte that is not on npm yet, `bun run vendor-gpuix [ref]`
 (`scripts/vendor-gpuix.ts`, default `main`) clones that ref, packs it with gpuix-svelte's own
